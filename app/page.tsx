@@ -758,7 +758,7 @@ return (
           Simple wellness planning
         </p>
         <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
-          Health 365
+          Health Tracker 365
         </h1>
       </div>
 
@@ -1096,15 +1096,6 @@ return (
             </SectionCard>
           </div>
         ) : null}
-      </div>
-
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#eadfbe] bg-[rgba(255,252,245,0.96)] px-3 py-3 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-md items-center gap-2 rounded-[28px] border border-[#eadfbe] bg-white/95 p-2 shadow-[0_16px_34px_rgba(180,150,85,0.18)]">
-          <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
-          <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
-          <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
-          <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
-        </div>
       </div>
 
       {showHabitForm ? (
