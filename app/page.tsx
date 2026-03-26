@@ -766,25 +766,22 @@ export default function HealthTrackerPage() {
     <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
     <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
   </div>
-</div
-
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
 
       <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-        {tab === "today" ? (
-          <div className="space-y-5">
-            <SectionCard title="Today" subtitle={formatDateLong(today)}>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <MetricCard label="Habits" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Done today" emoji={icon("habits")} />
-                <MetricCard label="Weight" value={todayEntry.weight || "-"} subtext="Today check-in" emoji={icon("weight")} />
-                <MetricCard label="Meals" value={`${todayEntry.meals.length}`} subtext="Logged today" emoji={icon("meals")} />
-                <MetricCard label="Flare" value={todayEntry.flareLevel || "-"} subtext="Today status" emoji={icon("flare")} />
-              </div>
-            </SectionCard>
+        {tab === "today" && (
+  <div className="space-y-5">
+    <SectionCard title="Today" subtitle={formatDateLong(today)}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MetricCard label="Habits" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Done today" emoji={icon("habit")} />
+        <MetricCard label="Weight" value={todayEntry.weight || "-"} subtext="Today check-in" emoji={icon("weight")} />
+        <MetricCard label="Meals" value={`${todayEntry.meals.length}`} subtext="Logged today" emoji={icon("meals")} />
+        <MetricCard label="Flare" value={todayEntry.flareLevel || "-"} subtext="Today status" emoji={icon("flare")} />
+      </div>
+    </SectionCard>
 
-            {renderDayEditor(today)}
-          </div>
-        ) : null}
+    {renderDayEditor(today)}
+  </div>
+)}
 
         {tab === "calendar" ? (
           <div className="space-y-5">
