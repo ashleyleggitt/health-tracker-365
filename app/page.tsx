@@ -750,7 +750,8 @@ export default function HealthTrackerPage() {
     );
   }
 
- return (
+return (
+  <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ec_0%,#f7f0df_35%,#f3ecdb_100%)]">
     <div className="mx-auto max-w-6xl px-4 pt-4 pb-3 sm:px-6 lg:px-8">
       <div className="text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">
@@ -758,6 +759,18 @@ export default function HealthTrackerPage() {
         </p>
         <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
           Health 365
+        </h1>
+      </div>
+
+      <div className="mt-4">
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-[28px] border border-[#eadfbe] bg-white/95 p-2 shadow-[0_16px_34px_rgba(180,150,85,0.18)]">
+          <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
+          <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
+          <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
+          <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
+        </div>
+      </div>
+    </div>
 
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
       {tab === "today" ? (
