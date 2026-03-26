@@ -766,10 +766,7 @@ export default function HealthTrackerPage() {
     <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
     <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
   </div>
-</div>
-    </div>
-
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
+</div
 
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
 
