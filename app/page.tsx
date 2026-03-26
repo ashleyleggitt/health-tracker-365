@@ -750,26 +750,23 @@ export default function HealthTrackerPage() {
     );
   }
 
-  return (
-  <div className="min-h-screen bg-gradient-to-b from-[#fffdf8] via-[#fbf7ef] to-[#f5efdf] pb-28 text-stone-800">
-    <div className="sticky top-0 z-20 border-b border-[#eadfbe] bg-[rgba(255,252,245,0.92)] backdrop-blur">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center px-4 py-4 sm:px-6 lg:px-8 md:grid-cols-[1fr_auto_1fr]">
-        <div className="w-full text-center md:col-start-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">
-            Simple wellness planning
-          </p>
-          <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
-            Health Tracker 365
-          </h1>
-        </div>
-
-       <div className="hidden gap-2 md:col-start-3 md:flex md:justify-end">
-          <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
-          <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
-          <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
-          <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
-        </div>
-      </div>
+ return (
+ <div className="mx-auto grid max-w-6xl grid-cols-1 items-center px-4 py-4 sm:px-6 lg:px-8 md:grid-cols-[1fr_auto_1fr]">
+  <div className="w-full text-center md:col-start-2">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">Simple wellness planning</p>
+    <h1
+      className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl"
+    >
+      Health Tracker 365
+    </h1>
+  </div>
+  <div className="hidden gap-2 md:col-start-3 md:flex md:justify-end">
+    <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
+    <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
+    <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
+    <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
+  </div>
+</div>
     </div>
 
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
