@@ -751,37 +751,32 @@ export default function HealthTrackerPage() {
   }
 
  return (
- <div className="mx-auto grid max-w-6xl grid-cols-1 items-center px-4 py-4 sm:px-6 lg:px-8 md:grid-cols-[1fr_auto_1fr]">
-  <div className="w-full text-center md:col-start-2">
-    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">Simple wellness planning</p>
-    <h1
-      className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl"
-    >
-      Health Tracker 365
-    </h1>
-  </div>
-  <div className="hidden gap-2 md:col-start-3 md:flex md:justify-end">
-    <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
-    <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
-    <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
-    <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
-  </div>
-
-      <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8 md:col-span-3">
-        {tab === "today" && (
-  <div className="space-y-5">
-    <SectionCard title="Today" subtitle={formatDateLong(today)}>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MetricCard label="Habits" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Done today" emoji={icon("habits")} />
-        <MetricCard label="Weight" value={todayEntry.weight || "-"} subtext="Today check-in" emoji={icon("weight")} />
-        <MetricCard label="Meals" value={`${todayEntry.meals.length}`} subtext="Logged today" emoji={icon("meals")} />
-        <MetricCard label="Flare" value={todayEntry.flareLevel || "-"} subtext="Today status" emoji={icon("flare")} />
+  <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ec_0%,#f7f0df_35%,#f3ecdb_100%)]">
+    <div className="mx-auto max-w-6xl px-4 pt-4 pb-3 sm:px-6 lg:px-8">
+      <div className="text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">
+          Simple wellness planning
+        </p>
+        <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
+          Health 365
+        </h1>
       </div>
-    </SectionCard>
 
-    {renderDayEditor(today)}
-  </div>
-)}
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
+      {tab === "today" ? (
+        <div className="space-y-5">
+          <SectionCard title="Today" subtitle={formatDateLong(today)}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <MetricCard label="Habits" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Done today" emoji={icon("habits")} />
+              <MetricCard label="Weight" value={todayEntry.weight || "-"} subtext="Today check-in" emoji={icon("weight")} />
+              <MetricCard label="Meals" value={`${todayEntry.meals.length}`} subtext="Logged today" emoji={icon("meals")} />
+              <MetricCard label="Flare" value={todayEntry.flareLevel || "-"} subtext="Today status" emoji={icon("flare")} />
+            </div>
+          </SectionCard>
+
+          {renderDayEditor(today)}
+        </div>
+      ) : null}
 
         {tab === "calendar" ? (
           <div className="space-y-5">
