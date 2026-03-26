@@ -751,7 +751,6 @@ export default function HealthTrackerPage() {
   }
 
  return (
-  <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ec_0%,#f7f0df_35%,#f3ecdb_100%)]">
     <div className="mx-auto max-w-6xl px-4 pt-4 pb-3 sm:px-6 lg:px-8">
       <div className="text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">
@@ -759,8 +758,6 @@ export default function HealthTrackerPage() {
         </p>
         <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
           Health 365
-        </h1>
-      </div>
 
     <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
       {tab === "today" ? (
