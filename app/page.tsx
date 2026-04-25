@@ -1,1177 +1,353 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import {
+  Camera,
+  CheckCircle2,
+  Dumbbell,
+  Edit3,
+  Flame,
+  Home,
+  LineChart,
+  NotebookTabs,
+  Plus,
+  Repeat,
+  Save,
+  Scale,
+  Smile,
+  Trash2,
+  Trophy,
+  Utensils,
+  Weight,
+  CalendarDays,
+  X
+} from "lucide-react";
 
-const STORAGE_KEY = "ashley-health-tracker-v5";
+const gold = "#C9A227";
+const cream = "#FBF7EF";
+const darkText = "#1F1B16";
 
-type Frequency = "daily" | "weekly";
-type Category = "health" | "routine" | "movement" | "food" | "mindset" | "other";
-type AppTab = "today" | "calendar" | "habits" | "insights";
+type Tab = "dashboard" | "weight" | "photos" | "food" | "workouts" | "habits" | "insights";
 
-type Habit = {
-  id: string;
-  name: string;
-  category: Category;
-  frequency: Frequency;
-  weeklyTarget: number;
-  archived?: boolean;
-};
+type WeightEntry = { id: number; date: string; weight: number; bodyFat?: number };
+type PhotoEntry = { id: number; date: string; type: string; url: string };
+type ExerciseEntry = { id: number; name: string; duration: string; sets: string; reps: string; weight: string };
+type WorkoutEntry = { id: number; date: string; exercises: ExerciseEntry[] };
+type HabitEntry = { id: number; name: string; category: string };
+type HabitLog = Record<number, string[]>;
+type MealEntry = { id: number; date: string; name: string; calories: string };
 
-type HabitLog = Record<string, string[]>;
-
-type MealEntry = {
-  id: string;
-  name: string;
-  calories?: number;
-  note?: string;
-};
-
-type WorkoutEntry = {
-  id: string;
-  name: string;
-  duration?: number;
-  note?: string;
-};
-
-type ScheduleEntry = {
-  id: string;
-  title: string;
-  note?: string;
-};
-
-type DayEntry = {
-  weight?: string;
-  calories?: string;
-  mood?: string;
-  flareLevel?: string;
-  feeling?: string;
-  triggers?: string;
-  notes?: string;
-  meals: MealEntry[];
-  workouts: WorkoutEntry[];
-  schedule: ScheduleEntry[];
-};
-
-type Store = {
-  habits: Habit[];
-  logs: HabitLog;
-  dayEntries: Record<string, DayEntry>;
-};
-
-const categoryOptions: Category[] = ["health", "routine", "movement", "food", "mindset", "other"];
-const moodOptions = ["", "Great", "Okay", "Low", "Stressed", "Irritable", "Tired"];
-const flareOptions = ["", "None", "Mild", "Moderate", "Bad"];
-
-function icon(label: string) {
-  const map: Record<string, string> = {
-    today: "☀️",
-    calendar: "🗓️",
-    habits: "✅",
-    insights: "📊",
-    weight: "⚖️",
-    meals: "🍽️",
-    flare: "💛",
-    streak: "🔥",
-    workouts: "🏃🏽‍♀️",
-    schedule: "📝",
-    add: "+",
-    reset: "↺",
-    archive: "✕",
-  };
-  return map[label] || "•";
-}
-
-function safeId() {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function todayKey() {
+function todayInputDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function formatDateLong(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+function formatDate(date: string) {
+  if (!date) return "No date";
+  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatDateShort(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  });
+function cleanNumber(value: string | number | undefined) {
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : null;
 }
 
-function formatMonthTitle(year: number, month: number) {
-  return new Date(year, month, 1).toLocaleDateString(undefined, {
-    month: "long",
-    year: "numeric",
-  });
+function isThisWeek(date: string) {
+  const now = new Date();
+  const start = new Date(now);
+  const day = start.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  start.setDate(now.getDate() + diff);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  const target = new Date(`${date}T12:00:00`);
+  return target >= start && target < end;
 }
 
-function getWeekDates(base = new Date()) {
-  const d = new Date(base);
+function weekKey(date: string) {
+  const d = new Date(`${date}T12:00:00`);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-
-  return Array.from({ length: 7 }, (_, i) => {
-    const x = new Date(d);
-    x.setDate(d.getDate() + i);
-    return x.toISOString().slice(0, 10);
-  });
+  return d.toISOString().slice(0, 10);
 }
 
-function getLast30Days() {
-  const dates: string[] = [];
-  const base = new Date();
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(base);
-    d.setDate(base.getDate() - i);
-    dates.push(d.toISOString().slice(0, 10));
+function weekLabel(weekStart: string) {
+  const start = new Date(`${weekStart}T12:00:00`);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+function GoldIcon({ children, large = false }: { children: React.ReactNode; large?: boolean }) {
+  return <div className={`flex items-center justify-center rounded-2xl ${large ? "h-14 w-14" : "h-11 w-11"}`} style={{ color: gold, background: "#FFF8E8" }}>{children}</div>;
+}
+
+function PlaceholderText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <p className={`text-gray-400 ${className}`}>{children}</p>;
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-[30px] border border-[#efe6d2] bg-white p-5 shadow-sm ${className}`}>{children}</div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block"><span className="mb-2 block text-sm text-gray-600">{label}</span>{children}</label>;
+}
+
+const inputClass = "w-full rounded-2xl border border-[#efe6d2] bg-[#FFFDF8] p-3 outline-none placeholder:text-gray-300 focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4]";
+const primaryButton = "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold text-white shadow-sm transition hover:brightness-95";
+const secondaryButton = "inline-flex items-center justify-center gap-2 rounded-2xl border border-[#efe6d2] bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-[#FFF8E8]";
+const deleteButton = "inline-flex items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 px-3 py-2 text-rose-500 transition hover:bg-rose-100";
+
+function ProgressBar({ value }: { value: number }) {
+  return <div className="h-4 overflow-hidden rounded-full bg-[#F4EAD6]"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: gold }} /></div>;
+}
+
+function HabitRing({ value, empty = false }: { value: number; empty?: boolean }) {
+  const radius = 54;
+  const stroke = 12;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (value / 100) * circumference;
+  return (
+    <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
+      <svg className="absolute h-36 w-36 -rotate-90" viewBox="0 0 140 140">
+        <circle cx="70" cy="70" r={radius} fill="none" stroke="#F4EAD6" strokeWidth={stroke} />
+        <circle cx="70" cy="70" r={radius} fill="none" stroke={empty ? "#E9DEC9" : gold} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={empty ? circumference : offset} />
+      </svg>
+      <div className="text-center"><p className={`text-3xl font-semibold ${empty ? "text-gray-400" : "text-stone-950"}`}>{empty ? "0%" : `${value}%`}</p><p className="text-xs text-gray-500">complete</p></div>
+    </div>
+  );
+}
+
+function MiniWeightChart({ weights }: { weights: WeightEntry[] }) {
+  const sorted = [...weights].sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+  if (sorted.length < 2) return <div className="flex h-44 items-center justify-center rounded-3xl bg-[#FFF8E8] text-gray-400">Log at least two weights to see your trend.</div>;
+  const values = sorted.map((w) => w.weight);
+  const min = Math.min(...values) - 1;
+  const max = Math.max(...values) + 1;
+  const width = 700;
+  const height = 220;
+  const pad = 26;
+  const points = sorted.map((entry, index) => {
+    const x = pad + (index / Math.max(sorted.length - 1, 1)) * (width - pad * 2);
+    const y = height - pad - ((entry.weight - min) / Math.max(max - min, 1)) * (height - pad * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <div className="rounded-3xl bg-gradient-to-br from-[#f7f0df] to-[#fff8e8] p-4">
+      <div className="mb-3 flex items-center justify-between text-sm text-gray-500"><span>Weight trend</span><span>Last 30 entries</span></div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-56 w-full">
+        <polyline fill="none" stroke={gold} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" points={points} />
+        {sorted.map((entry, index) => {
+          const x = pad + (index / Math.max(sorted.length - 1, 1)) * (width - pad * 2);
+          const y = height - pad - ((entry.weight - min) / Math.max(max - min, 1)) * (height - pad * 2);
+          return <circle key={entry.id} cx={x} cy={y} r="6" fill="white" stroke={gold} strokeWidth="4" />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
+export default function HealthTracker365() {
+  const [tab, setTab] = useState<Tab>("dashboard");
+
+  const [startingWeight, setStartingWeight] = useState("");
+  const [goalWeight, setGoalWeight] = useState("");
+  const [weightDate, setWeightDate] = useState(todayInputDate());
+  const [weightInput, setWeightInput] = useState("");
+  const [bodyFatInput, setBodyFatInput] = useState("");
+  const [weights, setWeights] = useState<WeightEntry[]>([]);
+  const [editingWeightId, setEditingWeightId] = useState<number | null>(null);
+
+  const [photos, setPhotos] = useState<PhotoEntry[]>([]);
+  const [photoType, setPhotoType] = useState("Front");
+  const [editingPhotoId, setEditingPhotoId] = useState<number | null>(null);
+
+  const [workouts, setWorkouts] = useState<WorkoutEntry[]>([]);
+  const [workoutDate, setWorkoutDate] = useState(todayInputDate());
+  const [exerciseName, setExerciseName] = useState("");
+  const [exerciseDuration, setExerciseDuration] = useState("");
+  const [exerciseSets, setExerciseSets] = useState("");
+  const [exerciseReps, setExerciseReps] = useState("");
+  const [exerciseWeight, setExerciseWeight] = useState("");
+  const [draftExercises, setDraftExercises] = useState<ExerciseEntry[]>([]);
+  const [editingWorkoutId, setEditingWorkoutId] = useState<number | null>(null);
+  const [editingExerciseId, setEditingExerciseId] = useState<number | null>(null);
+
+  const [habits, setHabits] = useState<HabitEntry[]>([]);
+  const [habitLogs, setHabitLogs] = useState<HabitLog>({});
+  const [habitDate, setHabitDate] = useState(todayInputDate());
+  const [habitName, setHabitName] = useState("");
+  const [habitCategory, setHabitCategory] = useState("Routine");
+  const [editingHabitId, setEditingHabitId] = useState<number | null>(null);
+
+  const [mealDate, setMealDate] = useState(todayInputDate());
+  const [mealName, setMealName] = useState("");
+  const [mealCalories, setMealCalories] = useState("");
+  const [meals, setMeals] = useState<MealEntry[]>([]);
+  const [editingMealId, setEditingMealId] = useState<number | null>(null);
+  const [mood, setMood] = useState("");
+  const [dailyNote, setDailyNote] = useState("");
+
+  const startNum = cleanNumber(startingWeight);
+  const goalNum = cleanNumber(goalWeight);
+  const sortedWeightsNewest = [...weights].sort((a, b) => b.date.localeCompare(a.date));
+  const latestWeight = sortedWeightsNewest[0]?.weight ?? null;
+  const hasWeightSetup = Boolean(startNum && latestWeight && goalNum && startNum > goalNum);
+  const totalLost = hasWeightSetup && startNum && latestWeight ? Math.max(0, startNum - latestWeight) : 0;
+  const remaining = hasWeightSetup && latestWeight && goalNum ? Math.max(0, latestWeight - goalNum) : 0;
+  const goalProgress = hasWeightSetup && startNum && latestWeight && goalNum ? Math.round(((startNum - latestWeight) / (startNum - goalNum)) * 100) : 0;
+
+  const workoutsThisWeek = workouts.filter((workout) => isThisWeek(workout.date)).length;
+  const todaysHabitLogs = habits.filter((habit) => habitLogs[habit.id]?.includes(todayInputDate())).length;
+  const habitProgress = habits.length > 0 ? Math.round((todaysHabitLogs / habits.length) * 100) : 0;
+  const hasHabits = habits.length > 0;
+
+  const groupedWeights = useMemo(() => {
+    const groups = new Map<string, WeightEntry[]>();
+    weights.forEach((entry) => groups.set(weekKey(entry.date), [...(groups.get(weekKey(entry.date)) || []), entry]));
+    return Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a)).map(([key, entries]) => {
+      const sortedEntries = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+      const avg = entries.reduce((sum, entry) => sum + entry.weight, 0) / entries.length;
+      return { key, label: isThisWeek(key) ? "This Week" : weekLabel(key), average: avg, entries: sortedEntries };
+    });
+  }, [weights]);
+
+  const strengthPRs = useMemo(() => {
+    const best = new Map<string, { weight: number; date: string }>();
+    workouts.forEach((workout) => workout.exercises.forEach((exercise) => {
+      const weight = cleanNumber(exercise.weight);
+      const name = exercise.name.trim();
+      if (!name || !weight) return;
+      const key = name.toLowerCase();
+      const current = best.get(key);
+      if (!current || weight > current.weight) best.set(key, { weight, date: workout.date });
+    }));
+    return Array.from(best.entries()).map(([name, data]) => ({ name, ...data }));
+  }, [workouts]);
+
+  const nav: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
+    { id: "dashboard", label: "Home", icon: <Home size={22} /> },
+    { id: "weight", label: "Weight", icon: <Scale size={22} /> },
+    { id: "photos", label: "Photos", icon: <Camera size={22} /> },
+    { id: "food", label: "Food", icon: <NotebookTabs size={22} /> },
+    { id: "workouts", label: "Workout", icon: <Dumbbell size={22} /> },
+    { id: "habits", label: "Habits", icon: <CheckCircle2 size={22} /> },
+    { id: "insights", label: "Insights", icon: <LineChart size={22} /> }
+  ];
+
+  function clearWeightForm() { setEditingWeightId(null); setWeightInput(""); setBodyFatInput(""); setWeightDate(todayInputDate()); }
+  function saveWeight() {
+    const weight = cleanNumber(weightInput);
+    if (!weight) return;
+    const entry = { id: editingWeightId ?? Date.now(), date: weightDate, weight, bodyFat: bodyFatInput ? Number(bodyFatInput) : undefined };
+    setWeights((prev) => editingWeightId ? prev.map((w) => w.id === editingWeightId ? entry : w) : [entry, ...prev.filter((w) => w.date !== weightDate)]);
+    clearWeightForm();
   }
-  return dates;
-}
+  function editWeight(entry: WeightEntry) { setEditingWeightId(entry.id); setWeightDate(entry.date); setWeightInput(String(entry.weight)); setBodyFatInput(entry.bodyFat ? String(entry.bodyFat) : ""); setTab("weight"); }
+  function deleteWeight(id: number) { setWeights((prev) => prev.filter((entry) => entry.id !== id)); if (editingWeightId === id) clearWeightForm(); }
 
-function getMonthCells(year: number, month: number) {
-  const first = new Date(year, month, 1);
-  const firstDay = first.getDay();
-  const leading = firstDay === 0 ? 6 : firstDay - 1;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  function handlePhotoUpload(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      setPhotos((prev) => [{ id: Date.now(), date: todayInputDate(), type: photoType, url: reader.result as string }, ...prev]);
+    };
+    reader.readAsDataURL(file);
+  }
+  function editPhoto(photo: PhotoEntry) { setEditingPhotoId(photo.id); setPhotoType(photo.type); setTab("photos"); }
+  function savePhotoEdit() { if (!editingPhotoId) return; setPhotos((prev) => prev.map((p) => p.id === editingPhotoId ? { ...p, type: photoType } : p)); setEditingPhotoId(null); setPhotoType("Front"); }
+  function cancelPhotoEdit() { setEditingPhotoId(null); setPhotoType("Front"); }
+  function deletePhoto(id: number) { setPhotos((prev) => prev.filter((photo) => photo.id !== id)); if (editingPhotoId === id) cancelPhotoEdit(); }
 
-  const cells: Array<{ date: string | null; day: number | null }> = [];
-  for (let i = 0; i < leading; i++) cells.push({ date: null, day: null });
-  for (let day = 1; day <= daysInMonth; day++) {
-    cells.push({
-      date: new Date(year, month, day).toISOString().slice(0, 10),
-      day,
+  function clearExerciseForm() { setEditingExerciseId(null); setExerciseName(""); setExerciseDuration(""); setExerciseSets(""); setExerciseReps(""); setExerciseWeight(""); }
+  function addOrUpdateExercise() {
+    if (!exerciseName.trim()) return;
+    const exercise = { id: editingExerciseId ?? Date.now(), name: exerciseName.trim(), duration: exerciseDuration, sets: exerciseSets, reps: exerciseReps, weight: exerciseWeight };
+    setDraftExercises((prev) => editingExerciseId ? prev.map((e) => e.id === editingExerciseId ? exercise : e) : [...prev, exercise]);
+    clearExerciseForm();
+  }
+  function editDraftExercise(exercise: ExerciseEntry) { setEditingExerciseId(exercise.id); setExerciseName(exercise.name); setExerciseDuration(exercise.duration); setExerciseSets(exercise.sets); setExerciseReps(exercise.reps); setExerciseWeight(exercise.weight); }
+  function deleteDraftExercise(id: number) { setDraftExercises((prev) => prev.filter((exercise) => exercise.id !== id)); if (editingExerciseId === id) clearExerciseForm(); }
+  function clearWorkoutForm() { setEditingWorkoutId(null); setWorkoutDate(todayInputDate()); setDraftExercises([]); clearExerciseForm(); }
+  function saveWorkout() {
+    if (draftExercises.length === 0) return;
+    const workout = { id: editingWorkoutId ?? Date.now(), date: workoutDate, exercises: draftExercises };
+    setWorkouts((prev) => editingWorkoutId ? prev.map((w) => w.id === editingWorkoutId ? workout : w) : [workout, ...prev]);
+    clearWorkoutForm();
+  }
+  function editWorkout(workout: WorkoutEntry) { setEditingWorkoutId(workout.id); setWorkoutDate(workout.date); setDraftExercises(workout.exercises.map((e) => ({ ...e }))); clearExerciseForm(); setTab("workouts"); }
+  function repeatWorkout(workout: WorkoutEntry) { setWorkouts((prev) => [{ id: Date.now(), date: workoutDate, exercises: workout.exercises.map((e) => ({ ...e, id: Date.now() + Math.random() })) }, ...prev]); }
+  function deleteWorkout(id: number) { setWorkouts((prev) => prev.filter((workout) => workout.id !== id)); if (editingWorkoutId === id) clearWorkoutForm(); }
+
+  function clearHabitForm() { setEditingHabitId(null); setHabitName(""); setHabitCategory("Routine"); }
+  function addOrUpdateHabit() {
+    if (!habitName.trim()) return;
+    const habit = { id: editingHabitId ?? Date.now(), name: habitName.trim(), category: habitCategory };
+    setHabits((prev) => editingHabitId ? prev.map((h) => h.id === editingHabitId ? habit : h) : [habit, ...prev]);
+    clearHabitForm();
+  }
+  function editHabit(habit: HabitEntry) { setEditingHabitId(habit.id); setHabitName(habit.name); setHabitCategory(habit.category); setTab("habits"); }
+  function toggleHabitForDate(habitId: number) {
+    setHabitLogs((prev) => {
+      const current = new Set(prev[habitId] || []);
+      current.has(habitDate) ? current.delete(habitDate) : current.add(habitDate);
+      return { ...prev, [habitId]: Array.from(current).sort() };
     });
   }
-  while (cells.length % 7 !== 0) cells.push({ date: null, day: null });
-  return cells;
-}
-
-function loadStore(): Store {
-  if (typeof window === "undefined") return { habits: [], logs: {}, dayEntries: {} };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { habits: [], logs: {}, dayEntries: {} };
-    const parsed = JSON.parse(raw);
-    return {
-      habits: Array.isArray(parsed.habits) ? parsed.habits : [],
-      logs: parsed.logs && typeof parsed.logs === "object" ? parsed.logs : {},
-      dayEntries: parsed.dayEntries && typeof parsed.dayEntries === "object" ? parsed.dayEntries : {},
-    };
-  } catch {
-    return { habits: [], logs: {}, dayEntries: {} };
-  }
-}
-
-function createEmptyDayEntry(): DayEntry {
-  return {
-    weight: "",
-    calories: "",
-    mood: "",
-    flareLevel: "",
-    feeling: "",
-    triggers: "",
-    notes: "",
-    meals: [],
-    workouts: [],
-    schedule: [],
-  };
-}
-
-function getDayEntry(dayEntries: Record<string, DayEntry>, date: string): DayEntry {
-  return dayEntries[date] || createEmptyDayEntry();
-}
-
-function updateDayEntry(
-  dayEntries: Record<string, DayEntry>,
-  date: string,
-  updater: (current: DayEntry) => DayEntry
-) {
-  const current = getDayEntry(dayEntries, date);
-  return {
-    ...dayEntries,
-    [date]: updater(current),
-  };
-}
-
-function getEntries(logs: HabitLog, habitId: string) {
-  return logs[habitId] || [];
-}
-
-function isDone(logs: HabitLog, habitId: string, date: string) {
-  return getEntries(logs, habitId).includes(date);
-}
-
-function toggleLog(logs: HabitLog, habitId: string, date: string): HabitLog {
-  const current = new Set(getEntries(logs, habitId));
-  if (current.has(date)) current.delete(date);
-  else current.add(date);
-  return { ...logs, [habitId]: Array.from(current).sort() };
-}
-
-function countInDates(logs: HabitLog, habitId: string, dates: string[]) {
-  const current = new Set(getEntries(logs, habitId));
-  return dates.filter((d) => current.has(d)).length;
-}
-
-function getStreak(logs: HabitLog, habitId: string) {
-  const set = new Set(getEntries(logs, habitId));
-  let streak = 0;
-  const cursor = new Date();
-
-  while (true) {
-    const key = cursor.toISOString().slice(0, 10);
-    if (!set.has(key)) break;
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
+  function deleteHabit(id: number) {
+    setHabits((prev) => prev.filter((habit) => habit.id !== id));
+    setHabitLogs((prev) => { const next = { ...prev }; delete next[id]; return next; });
+    if (editingHabitId === id) clearHabitForm();
   }
 
-  return streak;
-}
-
-function runInternalTests() {
-  const week = getWeekDates(new Date("2026-03-25T12:00:00"));
-  if (week.length !== 7) throw new Error("Test failed: week should have 7 dates");
-  if (week[0] !== "2026-03-23") throw new Error("Test failed: week should start on Monday");
-
-  const toggledOnce = toggleLog({}, "habit-1", "2026-03-25");
-  if (!isDone(toggledOnce, "habit-1", "2026-03-25")) throw new Error("Test failed: toggle should add date");
-
-  const toggledTwice = toggleLog(toggledOnce, "habit-1", "2026-03-25");
-  if (isDone(toggledTwice, "habit-1", "2026-03-25")) throw new Error("Test failed: second toggle should remove date");
-
-  const empty = createEmptyDayEntry();
-  if (empty.meals.length !== 0 || empty.workouts.length !== 0 || empty.schedule.length !== 0) {
-    throw new Error("Test failed: empty day entry collections should start empty");
+  function clearMealForm() { setEditingMealId(null); setMealDate(todayInputDate()); setMealName(""); setMealCalories(""); }
+  function addOrUpdateMeal() {
+    if (!mealName.trim()) return;
+    const meal = { id: editingMealId ?? Date.now(), date: mealDate, name: mealName.trim(), calories: mealCalories };
+    setMeals((prev) => editingMealId ? prev.map((m) => m.id === editingMealId ? meal : m) : [meal, ...prev]);
+    clearMealForm();
   }
+  function editMeal(meal: MealEntry) { setEditingMealId(meal.id); setMealDate(meal.date); setMealName(meal.name); setMealCalories(meal.calories); setTab("food"); }
+  function deleteMeal(id: number) { setMeals((prev) => prev.filter((meal) => meal.id !== id)); if (editingMealId === id) clearMealForm(); }
 
-  const monthCells = getMonthCells(2026, 2);
-  if (monthCells.length < 35) throw new Error("Test failed: month grid should include full weeks");
+  const latestPhoto = useMemo(() => photos[0], [photos]);
+  const firstPhoto = useMemo(() => photos[photos.length - 1], [photos]);
+  const todaysMeals = meals.filter((meal) => meal.date === todayInputDate());
 
-  const updated = updateDayEntry({}, "2026-03-25", (current) => ({ ...current, weight: "250" }));
-  if (getDayEntry(updated, "2026-03-25").weight !== "250") {
-    throw new Error("Test failed: updateDayEntry should persist field changes");
-  }
-}
-
-function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-[28px] border border-[#eadfbe] bg-white/95 p-4 shadow-[0_12px_30px_rgba(180,150,85,0.12)] backdrop-blur-sm sm:p-5">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-stone-900 sm:text-lg">{title}</h2>
-        {subtitle ? <p className="mt-1 text-sm text-stone-500">{subtitle}</p> : null}
-      </div>
-      {children}
-    </div>
-  );
-}
+    <div className="min-h-screen pb-28" style={{ background: cream, color: darkText }}>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <header className="mb-8 flex items-center justify-between">
+          <div><h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Health Tracker <span style={{ color: "#E4C985" }}>365</span></h1><p className="mt-2 text-gray-500">Track your health. Transform your life.</p></div>
+        </header>
 
-function MetricCard({
-  label,
-  value,
-  subtext,
-  emoji,
-}: {
-  label: string;
-  value: string;
-  subtext: string;
-  emoji: string;
-}) {
-  return (
-    <div className="rounded-[24px] border border-[#eadfbe] bg-white/95 p-4 shadow-[0_12px_26px_rgba(180,150,85,0.10)]">
-      <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f9edc7] to-[#ebd79d] text-lg text-[#7b612c] shadow-sm">
-        <span aria-hidden="true">{emoji}</span>
-      </div>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b48a32]">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-stone-900">{value}</p>
-      <p className="mt-1 text-sm text-stone-500">{subtext}</p>
-    </div>
-  );
-}
-
-function SmallPill({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded-full border border-[#ecdcb5] bg-[#faf1dd] px-2.5 py-1 text-[11px] text-[#896c33] shadow-sm">
-      {children}
-    </span>
-  );
-}
-
-function TabButton({
-  active,
-  emoji,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  emoji: string;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-xs font-medium transition ${
-        active
-          ? "bg-gradient-to-b from-[#f8eecf] to-[#efdcae] text-stone-900 shadow-[0_8px_18px_rgba(193,156,77,0.24)]"
-          : "text-stone-500"
-      }`}
-    >
-      <span
-        className={`flex h-8 w-8 items-center justify-center rounded-xl text-base ${
-          active ? "bg-white/80 shadow-sm" : "bg-[#fff9eb]"
-        }`}
-        aria-hidden="true"
-      >
-        {emoji}
-      </span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function PrimaryButton({ children, onClick, className = "", type = "button" }: { children: React.ReactNode; onClick?: () => void; className?: string; type?: "button" | "submit" }) {
-  return (
-    <button
-      type={type}
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-2xl border border-[#d8c48a] bg-gradient-to-b from-[#f7ebc7] to-[#ecd9a7] px-4 py-2.5 text-sm font-medium text-stone-800 shadow-[0_8px_20px_rgba(190,160,90,0.18)] transition hover:brightness-[1.02] ${className}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-export default function HealthTrackerPage() {
-  const [ready, setReady] = useState(false);
-  const [tab, setTab] = useState<AppTab>("today");
-  const [habits, setHabits] = useState<Habit[]>([]);
-  const [logs, setLogs] = useState<HabitLog>({});
-  const [dayEntries, setDayEntries] = useState<Record<string, DayEntry>>({});
-  const [showHabitForm, setShowHabitForm] = useState(false);
-  const [selectedHabitId, setSelectedHabitId] = useState<string>("all");
-  const [selectedDate, setSelectedDate] = useState(todayKey());
-  const [habitForm, setHabitForm] = useState({
-    name: "",
-    category: "health" as Category,
-    frequency: "daily" as Frequency,
-    weeklyTarget: 3,
-  });
-  const [monthCursor, setMonthCursor] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() };
-  });
-  const [mealForm, setMealForm] = useState({ name: "", calories: "", note: "" });
-  const [workoutForm, setWorkoutForm] = useState({ name: "", duration: "", note: "" });
-  const [scheduleForm, setScheduleForm] = useState({ title: "", note: "" });
-
-  useEffect(() => {
-    runInternalTests();
-    const data = loadStore();
-    setHabits(data.habits);
-    setLogs(data.logs);
-    setDayEntries(data.dayEntries);
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready || typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ habits, logs, dayEntries }));
-  }, [habits, logs, dayEntries, ready]);
-
-  const activeHabits = useMemo(() => habits.filter((h) => !h.archived), [habits]);
-  const weekDates = getWeekDates();
-  const last30Days = getLast30Days();
-  const today = todayKey();
-  const todayEntry = getDayEntry(dayEntries, today);
-  const selectedEntry = getDayEntry(dayEntries, selectedDate);
-  const monthCells = getMonthCells(monthCursor.year, monthCursor.month);
-  const monthTitle = formatMonthTitle(monthCursor.year, monthCursor.month);
-
-  const selectedHabits =
-    selectedHabitId === "all"
-      ? activeHabits
-      : activeHabits.filter((h) => h.id === selectedHabitId);
-
-  const completedToday = activeHabits.filter((h) => isDone(logs, h.id, today)).length;
-  const bestStreak = activeHabits.length ? Math.max(...activeHabits.map((h) => getStreak(logs, h.id))) : 0;
-  const totalHabitCheckins30 = activeHabits.reduce((sum, h) => sum + countInDates(logs, h.id, last30Days), 0);
-  const workoutCount30 = last30Days.reduce((sum, date) => sum + getDayEntry(dayEntries, date).workouts.length, 0);
-  const mealCount30 = last30Days.reduce((sum, date) => sum + getDayEntry(dayEntries, date).meals.length, 0);
-  const flareDays30 = last30Days.filter((date) => {
-    const flare = getDayEntry(dayEntries, date).flareLevel;
-    return flare === "Mild" || flare === "Moderate" || flare === "Bad";
-  }).length;
-  const daysWithWeight30 = last30Days.filter((date) => Boolean(getDayEntry(dayEntries, date).weight)).length;
-  const calorieValues30 = last30Days
-    .map((date) => Number(getDayEntry(dayEntries, date).calories || ""))
-    .filter((value) => Number.isFinite(value) && value > 0);
-  const avgCalories30 = calorieValues30.length
-    ? Math.round(calorieValues30.reduce((sum, value) => sum + value, 0) / calorieValues30.length)
-    : 0;
-
-  const upcomingSchedule = Object.entries(dayEntries)
-    .filter(([date, entry]) => date >= today && entry.schedule.length > 0)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .slice(0, 10);
-
-  const recentFlares = Object.entries(dayEntries)
-    .filter(([, entry]) => entry.flareLevel === "Mild" || entry.flareLevel === "Moderate" || entry.flareLevel === "Bad")
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .slice(0, 8);
-
-  function addHabit() {
-    if (!habitForm.name.trim()) return;
-    const newHabit: Habit = {
-      id: safeId(),
-      name: habitForm.name.trim(),
-      category: habitForm.category,
-      frequency: habitForm.frequency,
-      weeklyTarget: habitForm.frequency === "daily" ? 7 : Math.max(1, habitForm.weeklyTarget),
-    };
-    setHabits((prev) => [newHabit, ...prev]);
-    setHabitForm({ name: "", category: "health", frequency: "daily", weeklyTarget: 3 });
-    setShowHabitForm(false);
-  }
-
-  function archiveHabit(id: string) {
-    setHabits((prev) => prev.map((h) => (h.id === id ? { ...h, archived: true } : h)));
-    if (selectedHabitId === id) setSelectedHabitId("all");
-  }
-
-  function resetToday() {
-    let next = { ...logs };
-    activeHabits.forEach((habit) => {
-      if (isDone(next, habit.id, today)) next = toggleLog(next, habit.id, today);
-    });
-    setLogs(next);
-  }
-
-  function setField(date: string, field: keyof Omit<DayEntry, "meals" | "workouts" | "schedule">, value: string) {
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        [field]: value,
-      }))
-    );
-  }
-
-  function addMeal(date: string) {
-    if (!mealForm.name.trim()) return;
-    const newMeal: MealEntry = {
-      id: safeId(),
-      name: mealForm.name.trim(),
-      calories: mealForm.calories ? Number(mealForm.calories) : undefined,
-      note: mealForm.note.trim() || undefined,
-    };
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        meals: [newMeal, ...current.meals],
-      }))
-    );
-    setMealForm({ name: "", calories: "", note: "" });
-  }
-
-  function addWorkout(date: string) {
-    if (!workoutForm.name.trim()) return;
-    const newWorkout: WorkoutEntry = {
-      id: safeId(),
-      name: workoutForm.name.trim(),
-      duration: workoutForm.duration ? Number(workoutForm.duration) : undefined,
-      note: workoutForm.note.trim() || undefined,
-    };
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        workouts: [newWorkout, ...current.workouts],
-      }))
-    );
-    setWorkoutForm({ name: "", duration: "", note: "" });
-  }
-
-  function addScheduleItem(date: string) {
-    if (!scheduleForm.title.trim()) return;
-    const newItem: ScheduleEntry = {
-      id: safeId(),
-      title: scheduleForm.title.trim(),
-      note: scheduleForm.note.trim() || undefined,
-    };
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        schedule: [newItem, ...current.schedule],
-      }))
-    );
-    setScheduleForm({ title: "", note: "" });
-  }
-
-  function removeMeal(date: string, id: string) {
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        meals: current.meals.filter((item) => item.id !== id),
-      }))
-    );
-  }
-
-  function removeWorkout(date: string, id: string) {
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        workouts: current.workouts.filter((item) => item.id !== id),
-      }))
-    );
-  }
-
-  function removeScheduleItem(date: string, id: string) {
-    setDayEntries((prev) =>
-      updateDayEntry(prev, date, (current) => ({
-        ...current,
-        schedule: current.schedule.filter((item) => item.id !== id),
-      }))
-    );
-  }
-
-  function renderDayEditor(date: string) {
-    const entry = getDayEntry(dayEntries, date);
-
-    return (
-      <div className="space-y-4">
-        <SectionCard title="Quick check-in" subtitle={`For ${formatDateLong(date)}`}>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-stone-700">Daily weight</label>
-              <input
-                value={entry.weight || ""}
-                onChange={(e) => setField(date, "weight", e.target.value)}
-                className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-stone-700">Calories</label>
-              <input
-                value={entry.calories || ""}
-                onChange={(e) => setField(date, "calories", e.target.value)}
-                className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-              />
-            </div>
+        {tab === "dashboard" && <div className="space-y-6">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            <Card><GoldIcon large><Scale size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Weight Progress</h2>{latestWeight ? <><p className="mt-3 text-4xl font-semibold">{latestWeight} <span className="text-xl font-normal">lbs</span></p><p className="mt-1 text-gray-500">current weight</p><div className="mt-5"><ProgressBar value={goalProgress} /></div><p className="mt-2 text-sm text-gray-500">{hasWeightSetup ? `${totalLost.toFixed(1)} lbs lost` : "Add start + goal weight"}</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">Log first weight</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your trend will show here</PlaceholderText><div className="mt-6"><ProgressBar value={0} /></div><button onClick={() => setTab("weight")} className="mt-5 text-sm font-semibold" style={{ color: gold }}>Open weight log ›</button></>}</Card>
+            <Card><GoldIcon large><Trophy size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Strength PRs</h2>{strengthPRs.length > 0 ? <><p className="mt-3 text-4xl font-semibold">{strengthPRs.length}</p><p className="mt-1 text-gray-500">records tracked</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">No records yet</PlaceholderText><PlaceholderText className="mt-1 text-sm">Log exercise weight to track PRs</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View PRs <span>›</span></button></Card>
+            <Card><GoldIcon large><Flame size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Workouts</h2>{workoutsThisWeek > 0 ? <><p className="mt-3 text-4xl font-semibold">{workoutsThisWeek}</p><p className="mt-1 text-gray-500">this week</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">Log first workout</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your weekly total will show here</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View Workouts <span>›</span></button></Card>
+            <Card><GoldIcon large><CheckCircle2 size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Habits</h2><HabitRing value={habitProgress} empty={!hasHabits} />{hasHabits ? <p className="mt-3 text-center text-gray-500">{todaysHabitLogs} of {habits.length} completed</p> : <PlaceholderText className="mt-3 text-center text-sm">Set up habits to track</PlaceholderText>}</Card>
           </div>
+          <Card><div className="grid gap-5 md:grid-cols-[1fr_2fr_1fr] md:items-center"><div><GoldIcon><Weight size={28} /></GoldIcon>{hasWeightSetup ? <p className="mt-3 text-3xl font-semibold" style={{ color: gold }}>{goalProgress}%</p> : <PlaceholderText className="mt-3 text-2xl font-semibold">Set goal</PlaceholderText>}<p className="text-gray-500">goal progress</p></div><div><p className="mb-2 text-center text-gray-600">{hasWeightSetup ? `${remaining.toFixed(1)} lbs to go` : "Enter starting + goal weight"}</p><ProgressBar value={goalProgress} /></div><div className="md:text-right"><p className="text-gray-500">Goal Weight</p>{goalNum ? <p className="text-3xl font-semibold" style={{ color: gold }}>{goalNum} lbs</p> : <PlaceholderText className="text-2xl font-semibold">Add goal</PlaceholderText>}</div></div></Card>
+          <div className="grid gap-6 lg:grid-cols-2"><Card><div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-3 text-xl font-semibold"><CalendarDays color={gold} /> Today</h2><span style={{ color: gold }}>{formatDate(todayInputDate())}</span></div>{[[<Scale key="scale" />, "Weight", latestWeight ? `${latestWeight} lbs` : "Enter weight", "weight"], [<Utensils key="meal" />, "Meals", todaysMeals.length ? `${todaysMeals.length} logged` : "Log meal", "food"], [<Dumbbell key="workout" />, "Workout", workoutsThisWeek > 0 ? `${workoutsThisWeek} this week` : "Log workout", "workouts"], [<CheckCircle2 key="habits" />, "Habits", hasHabits ? `${todaysHabitLogs}/${habits.length}` : "Set habits", "habits"], [<Smile key="mood" />, "Mood", mood || "Add mood", "food"], [<Edit3 key="note" />, "Notes", dailyNote ? "Added" : "Add note", "food"]].map((row) => <button key={String(row[1])} onClick={() => setTab(row[3] as Tab)} className="flex w-full items-center justify-between border-b border-[#efe6d2] py-4 text-left last:border-b-0"><span className="flex items-center gap-3 text-gray-700"><span style={{ color: gold }}>{row[0]}</span>{row[1]}</span><span className="flex items-center gap-3 text-gray-400">{row[2]} <span>›</span></span></button>)}</Card><Card><h2 className="mb-4 flex items-center gap-3 text-xl font-semibold"><Edit3 color={gold} /> Quick Log</h2><div className="grid grid-cols-3 gap-4 text-center">{[[<Scale key="qw" size={34} />, "Weight", "weight"], [<Dumbbell key="qwo" size={34} />, "Workout", "workouts"], [<Utensils key="qm" size={34} />, "Meal", "food"], [<CheckCircle2 key="qh" size={34} />, "Habit", "habits"], [<Smile key="qs" size={34} />, "Mood", "food"], [<NotebookTabs key="qn" size={34} />, "Note", "food"]].map((item) => <button key={String(item[1])} onClick={() => setTab(item[2] as Tab)} className="rounded-3xl border border-[#efe6d2] bg-white p-4 hover:bg-[#FFF8E8]"><div className="flex justify-center" style={{ color: gold }}>{item[0]}</div><p className="mt-2 text-sm text-gray-700">{item[1]}</p></button>)}</div></Card></div>
+        </div>}
 
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-stone-700">Mood</label>
-              <select
-                value={entry.mood || ""}
-                onChange={(e) => setField(date, "mood", e.target.value)}
-                className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-              >
-                {moodOptions.map((mood) => (
-                  <option key={mood} value={mood}>{mood || "Select mood"}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-stone-700">Flare level</label>
-              <select
-                value={entry.flareLevel || ""}
-                onChange={(e) => setField(date, "flareLevel", e.target.value)}
-                className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-              >
-                {flareOptions.map((flare) => (
-                  <option key={flare} value={flare}>{flare || "Select flare"}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </SectionCard>
+        {tab === "weight" && <div className="space-y-6"><div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-[30px] border border-[#eadfbe] bg-white p-5 shadow-sm"><p className="text-lg text-stone-500">Current Weight</p>{latestWeight ? <p className="mt-8 text-4xl font-semibold tracking-tight text-stone-950">{latestWeight} lb</p> : <PlaceholderText className="mt-8 text-3xl font-semibold">Log weight</PlaceholderText>}</div><div className="rounded-[30px] border border-[#eadfbe] bg-white p-5 shadow-sm"><p className="text-lg text-stone-500">Goal Weight</p><input value={goalWeight} placeholder="175" onChange={(e) => setGoalWeight(e.target.value)} className="mt-7 w-full rounded-2xl border border-[#efe6d2] bg-[#FFFDF8] p-3 text-3xl font-semibold tracking-tight outline-none placeholder:text-gray-300 focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4]" /></div><div className="rounded-[30px] border border-[#eadfbe] bg-white p-5 shadow-sm"><p className="text-lg text-stone-500">Starting Weight</p><input value={startingWeight} placeholder="265" onChange={(e) => setStartingWeight(e.target.value)} className="mt-7 w-full rounded-2xl border border-[#efe6d2] bg-[#FFFDF8] p-3 text-3xl font-semibold tracking-tight outline-none placeholder:text-gray-300 focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4]" /></div><div className="rounded-[30px] border border-[#eadfbe] bg-white p-5 shadow-sm"><p className="text-lg text-stone-500">Total Lost</p>{hasWeightSetup ? <p className="mt-8 text-4xl font-semibold tracking-tight text-stone-950">{totalLost.toFixed(1)} lb</p> : <PlaceholderText className="mt-8 text-3xl font-semibold">Set goal</PlaceholderText>}</div></div><Card><h2 className="mb-4 flex items-center gap-3 text-2xl font-semibold"><Scale color={gold} /> Weight Tracking</h2><p className="text-gray-500">Your newest logged weight becomes your current weight automatically.</p></Card><Card><h2 className="mb-4 flex items-center gap-3 text-xl font-semibold"><Plus color={gold} /> {editingWeightId ? "Edit Weight" : "Log Weight"}</h2><div className="grid gap-4 md:grid-cols-3"><Field label="Date"><input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className={inputClass} /></Field><Field label="Weight"><input value={weightInput} placeholder="254.8" onChange={(e) => setWeightInput(e.target.value)} className={inputClass} /></Field><Field label="Body Fat %"><input value={bodyFatInput} placeholder="Optional" onChange={(e) => setBodyFatInput(e.target.value)} className={inputClass} /></Field></div><div className="mt-4 flex gap-3"><button onClick={saveWeight} className={primaryButton} style={{ background: gold }}><Save size={18} />{editingWeightId ? "Update Weight" : "Save Weight"}</button>{editingWeightId && <button onClick={clearWeightForm} className={secondaryButton}><X size={18} />Cancel</button>}</div></Card><Card><h2 className="mb-4 text-xl font-semibold">30-Day Weight Trend</h2><MiniWeightChart weights={weights} /></Card><Card><h2 className="mb-4 text-xl font-semibold">Weight History</h2><div className="space-y-5">{groupedWeights.length === 0 ? <p className="text-gray-400">No weights logged yet.</p> : null}{groupedWeights.map((group) => <div key={group.key} className="overflow-hidden rounded-3xl border border-[#efe6d2]"><div className="flex items-center justify-between bg-[#C9A227] px-4 py-2 text-white"><p className="font-semibold">{group.label}</p><p className="font-semibold">{group.average.toFixed(1)} lbs avg</p></div><div className="divide-y divide-[#efe6d2] bg-white">{group.entries.map((entry) => <div key={entry.id} className="flex items-center justify-between gap-4 p-4"><div><p className="text-sm text-gray-500">{formatDate(entry.date)}</p><p className="text-2xl font-semibold">{entry.weight} <span className="text-sm font-normal text-gray-500">lbs</span></p></div><div className="flex items-center gap-2"><p className="text-lg text-gray-500">{entry.bodyFat ? `${entry.bodyFat}% Fat` : ""}</p><button onClick={() => editWeight(entry)} className={secondaryButton}><Edit3 size={18} /></button><button onClick={() => deleteWeight(entry.id)} className={deleteButton}><Trash2 size={18} /></button></div></div>)}</div></div>)}</div></Card></div>}
 
-        <SectionCard title="Meals + calories" subtitle="Add what you ate for this day.">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input
-              value={mealForm.name}
-              onChange={(e) => setMealForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf] sm:col-span-2"
-            />
-            <input
-              value={mealForm.calories}
-              onChange={(e) => setMealForm((prev) => ({ ...prev, calories: e.target.value }))}
-              className="rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-            />
-          </div>
-          <textarea
-            value={mealForm.note}
-            onChange={(e) => setMealForm((prev) => ({ ...prev, note: e.target.value }))}
-            rows={2}
-            className="mt-2 w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-          />
-          <PrimaryButton onClick={() => addMeal(date)} className="mt-3">
-            <span aria-hidden="true">{icon("add")}</span>
-            Add Meal
-          </PrimaryButton>
+        {tab === "photos" && <div className="space-y-6"><Card><h2 className="mb-4 flex items-center gap-3 text-2xl font-semibold"><Camera color={gold} /> Progress Photos</h2><div className="grid gap-4 md:grid-cols-3"><select value={photoType} onChange={(e) => setPhotoType(e.target.value)} className={inputClass}><option>Front</option><option>Side</option><option>Back</option><option>Flex</option></select>{editingPhotoId ? <div className="flex gap-3 md:col-span-2"><button onClick={savePhotoEdit} className={primaryButton} style={{ background: gold }}><Save size={18} />Update Photo Type</button><button onClick={cancelPhotoEdit} className={secondaryButton}><X size={18} />Cancel</button></div> : <input type="file" accept="image/*" onChange={(e) => handlePhotoUpload(e.target.files?.[0])} className={`${inputClass} md:col-span-2`} />}</div></Card><Card><h2 className="mb-4 text-xl font-semibold">Before / After</h2><div className="grid gap-4 md:grid-cols-2"><div className="overflow-hidden rounded-3xl bg-[#FFF8E8]">{firstPhoto ? <img src={firstPhoto.url} alt="Before progress" className="h-80 w-full object-cover" /> : <div className="flex h-80 items-center justify-center text-gray-400">First photo</div>}<p className="p-4 font-medium">Before</p></div><div className="overflow-hidden rounded-3xl bg-[#FFF8E8]">{latestPhoto ? <img src={latestPhoto.url} alt="After progress" className="h-80 w-full object-cover" /> : <div className="flex h-80 items-center justify-center text-gray-400">Latest photo</div>}<p className="p-4 font-medium">After</p></div></div></Card><Card><h2 className="mb-4 text-xl font-semibold">Photo Timeline</h2><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{photos.length === 0 ? <p className="text-gray-500">No photos yet.</p> : null}{photos.map((photo) => <div key={photo.id} className="overflow-hidden rounded-3xl border border-[#efe6d2] bg-white"><img src={photo.url} alt={`${photo.type} progress`} className="h-60 w-full object-cover" /><div className="flex items-center justify-between p-4"><div><p className="font-semibold">{photo.type}</p><p className="text-sm text-gray-500">{formatDate(photo.date)}</p></div><div className="flex gap-2"><button onClick={() => editPhoto(photo)} className={secondaryButton}><Edit3 size={18} /></button><button onClick={() => deletePhoto(photo.id)} className={deleteButton}><Trash2 size={18} /></button></div></div></div>)}</div></Card></div>}
 
-          <div className="mt-4 space-y-2">
-            {entry.meals.length === 0 ? <p className="text-sm text-stone-500">No meals logged yet.</p> : null}
-            {entry.meals.map((meal) => (
-              <div key={meal.id} className="rounded-2xl border border-[#ede2cb] bg-[#fffcf7] p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-stone-900">{meal.name}</p>
-                    <p className="text-sm text-stone-500">{meal.calories ? `${meal.calories} cal` : "Calories not added"}</p>
-                    {meal.note ? <p className="mt-1 text-sm text-stone-600">{meal.note}</p> : null}
-                  </div>
-                  <button onClick={() => removeMeal(date, meal.id)} className="rounded-xl p-2 text-stone-500 transition hover:bg-[#f8efdc]" aria-label="Remove meal">
-                    <span aria-hidden="true">{icon("archive")}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
+        {tab === "food" && <div className="space-y-6"><Card><h2 className="mb-4 flex items-center gap-3 text-2xl font-semibold"><NotebookTabs color={gold} /> Daily Food Log</h2><div className="grid gap-4 md:grid-cols-3"><Field label="Meal Date"><input type="date" value={mealDate} onChange={(e) => setMealDate(e.target.value)} className={inputClass} /></Field><Field label="Meal"><input value={mealName} placeholder="Example: smoothie" onChange={(e) => setMealName(e.target.value)} className={inputClass} /></Field><Field label="Calories"><input value={mealCalories} placeholder="Optional" onChange={(e) => setMealCalories(e.target.value)} className={inputClass} /></Field></div><div className="mt-4 flex gap-3"><button onClick={addOrUpdateMeal} className={primaryButton} style={{ background: gold }}><Save size={18} />{editingMealId ? "Update Meal" : "Add Meal"}</button>{editingMealId && <button onClick={clearMealForm} className={secondaryButton}><X size={18} />Cancel</button>}</div></Card><Card><h2 className="mb-4 flex items-center gap-3 text-xl font-semibold"><Smile color={gold} /> Mood + Notes</h2><div className="grid gap-4 md:grid-cols-2"><Field label="Mood"><input value={mood} placeholder="Example: Good" onChange={(e) => setMood(e.target.value)} className={inputClass} /></Field><Field label="Daily Note"><input value={dailyNote} placeholder="Add a quick note" onChange={(e) => setDailyNote(e.target.value)} className={inputClass} /></Field></div></Card><Card><h2 className="mb-4 text-xl font-semibold">Meal History</h2><div className="space-y-3">{meals.length === 0 ? <p className="text-gray-400">No meals logged yet.</p> : null}{meals.map((meal) => <div key={meal.id} className="flex items-center justify-between rounded-3xl bg-[#FFF8E8] p-4"><div><p className="font-semibold">{meal.name}</p><p className="text-sm text-gray-500">{formatDate(meal.date)} {meal.calories ? `· ${meal.calories} calories` : ""}</p></div><div className="flex gap-2"><button onClick={() => editMeal(meal)} className={secondaryButton}><Edit3 size={18} /></button><button onClick={() => deleteMeal(meal.id)} className={deleteButton}><Trash2 size={18} /></button></div></div>)}</div></Card></div>}
 
-        <SectionCard title="Workouts + progress" subtitle="Log movement and how your body handled it.">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <input
-              value={workoutForm.name}
-              onChange={(e) => setWorkoutForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf] sm:col-span-2"
-            />
-            <input
-              value={workoutForm.duration}
-              onChange={(e) => setWorkoutForm((prev) => ({ ...prev, duration: e.target.value }))}
-              className="rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-            />
-          </div>
-          <textarea
-            value={workoutForm.note}
-            onChange={(e) => setWorkoutForm((prev) => ({ ...prev, note: e.target.value }))}
-            rows={2}
-            className="mt-2 w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-          />
-          <PrimaryButton onClick={() => addWorkout(date)} className="mt-3">
-            <span aria-hidden="true">{icon("add")}</span>
-            Add Workout
-          </PrimaryButton>
+        {tab === "workouts" && <div className="space-y-6"><Card><h2 className="mb-4 flex items-center gap-3 text-2xl font-semibold"><Dumbbell color={gold} /> Workouts</h2><p className="mb-5 text-gray-500">Add exercises or cardio, then save. Edit loads a workout back here so you can update weights, reps, sets, duration, or add new exercises.</p><div className="rounded-3xl bg-[#FFF8E8] p-4"><h3 className="mb-3 font-semibold">{editingExerciseId ? "Edit Exercise" : "Add Exercise or Cardio"}</h3><div className="mb-4 max-w-xs"><Field label="Workout Date"><input type="date" value={workoutDate} onChange={(e) => setWorkoutDate(e.target.value)} className={inputClass} /></Field>{editingWorkoutId && <p className="mt-2 text-sm font-semibold text-gray-500">Editing saved workout</p>}</div><div className="grid gap-3 md:grid-cols-6"><Field label="Exercise"><input value={exerciseName} placeholder="Treadmill or hip thrust" onChange={(e) => setExerciseName(e.target.value)} className={inputClass} /></Field><Field label="Duration"><input value={exerciseDuration} placeholder="45 min optional" onChange={(e) => setExerciseDuration(e.target.value)} className={inputClass} /></Field><Field label="Sets"><input value={exerciseSets} placeholder="3 optional" onChange={(e) => setExerciseSets(e.target.value)} className={inputClass} /></Field><Field label="Reps"><input value={exerciseReps} placeholder="10 optional" onChange={(e) => setExerciseReps(e.target.value)} className={inputClass} /></Field><Field label="Weight"><input value={exerciseWeight} placeholder="90 optional" onChange={(e) => setExerciseWeight(e.target.value)} className={inputClass} /></Field><button onClick={addOrUpdateExercise} className={`${secondaryButton} self-end`}><Plus size={18} />{editingExerciseId ? "Update" : "Add"}</button></div>{editingExerciseId && <button onClick={clearExerciseForm} className={`${secondaryButton} mt-3`}><X size={18} />Cancel Exercise Edit</button>}<div className="mt-3 space-y-2">{draftExercises.length === 0 ? <p className="text-sm text-gray-400">No exercises added yet.</p> : null}{draftExercises.map((exercise) => <div key={exercise.id} className="flex items-center justify-between rounded-2xl bg-white p-3 text-sm"><span><b>{exercise.name}</b>{exercise.duration ? ` · ${exercise.duration}` : ""}{exercise.sets ? ` · ${exercise.sets} sets` : ""}{exercise.reps ? ` · ${exercise.reps} reps` : ""}{exercise.weight ? ` · ${exercise.weight} lb` : ""}</span><div className="flex gap-2"><button onClick={() => editDraftExercise(exercise)} className={secondaryButton}><Edit3 size={18} /></button><button onClick={() => deleteDraftExercise(exercise.id)} className={deleteButton}><Trash2 size={18} /></button></div></div>)}</div></div><div className="mt-4 flex flex-wrap gap-3"><button onClick={saveWorkout} className={primaryButton} style={{ background: gold }}><Save size={18} />{editingWorkoutId ? "Update Workout" : `Save Workout to ${formatDate(workoutDate)}`}</button>{editingWorkoutId && <button onClick={clearWorkoutForm} className={secondaryButton}><X size={18} />Cancel Edit</button>}</div></Card><Card><h2 className="mb-4 text-xl font-semibold">Workout History</h2><div className="space-y-3">{workouts.length === 0 ? <p className="text-gray-400">No workouts saved yet.</p> : null}{workouts.map((workout) => <div key={workout.id} className="rounded-3xl bg-[#FFF8E8] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-semibold">{formatDate(workout.date)}</p><p className="text-sm text-gray-500">{workout.exercises.length} exercises</p></div><div className="flex flex-wrap gap-2"><button onClick={() => editWorkout(workout)} className={secondaryButton}><Edit3 size={16} />Edit</button><button onClick={() => repeatWorkout(workout)} className={secondaryButton}><Repeat size={16} />Repeat to {formatDate(workoutDate)}</button><button onClick={() => deleteWorkout(workout.id)} className={deleteButton}><Trash2 size={18} /></button></div></div><div className="mt-3 space-y-1">{workout.exercises.map((exercise) => <p key={exercise.id} className="text-sm text-gray-700"><b>{exercise.name}</b>{exercise.duration ? ` · ${exercise.duration}` : ""}{exercise.sets ? ` · ${exercise.sets} sets` : ""}{exercise.reps ? ` · ${exercise.reps} reps` : ""}{exercise.weight ? ` · ${exercise.weight} lb` : ""}</p>)}</div></div>)}</div></Card></div>}
 
-          <div className="mt-4 space-y-2">
-            {entry.workouts.length === 0 ? <p className="text-sm text-stone-500">No workouts logged yet.</p> : null}
-            {entry.workouts.map((workout) => (
-              <div key={workout.id} className="rounded-2xl border border-[#ede2cb] bg-[#fffcf7] p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-stone-900">{workout.name}</p>
-                    <p className="text-sm text-stone-500">{workout.duration ? `${workout.duration} min` : "Duration not added"}</p>
-                    {workout.note ? <p className="mt-1 text-sm text-stone-600">{workout.note}</p> : null}
-                  </div>
-                  <button onClick={() => removeWorkout(date, workout.id)} className="rounded-xl p-2 text-stone-500 transition hover:bg-[#f8efdc]" aria-label="Remove workout">
-                    <span aria-hidden="true">{icon("archive")}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
+        {tab === "habits" && <div className="space-y-6"><Card><h2 className="mb-4 flex items-center gap-3 text-2xl font-semibold"><CheckCircle2 color={gold} /> Habit Tracking</h2><div className="grid gap-4 md:grid-cols-3"><Field label="Habit Name"><input value={habitName} placeholder="Example: Vitamins" onChange={(e) => setHabitName(e.target.value)} className={inputClass} /></Field><Field label="Category"><select value={habitCategory} onChange={(e) => setHabitCategory(e.target.value)} className={inputClass}><option>Routine</option><option>Health</option><option>Movement</option><option>Food</option><option>Mindset</option></select></Field><button onClick={addOrUpdateHabit} className={`${primaryButton} self-end`} style={{ background: gold }}><Save size={18} />{editingHabitId ? "Update Habit" : "Add Habit"}</button></div>{editingHabitId && <button onClick={clearHabitForm} className={`${secondaryButton} mt-4`}><X size={18} />Cancel</button>}</Card><Card><h2 className="mb-4 text-xl font-semibold">Check Habits by Date</h2><Field label="Selected Date"><input type="date" value={habitDate} onChange={(e) => setHabitDate(e.target.value)} className={inputClass} /></Field><div className="mt-5 space-y-3">{habits.length === 0 ? <p className="text-gray-400">No habits yet. Add one above.</p> : null}{habits.map((habit) => { const done = habitLogs[habit.id]?.includes(habitDate) || false; return <div key={habit.id} className={`flex items-center justify-between rounded-3xl border p-4 ${done ? "border-[#C9A227] bg-[#FFF8E8]" : "border-[#efe6d2] bg-white"}`}><button onClick={() => toggleHabitForDate(habit.id)} className="flex flex-1 items-center gap-3 text-left"><CheckCircle2 color={done ? gold : "#bbb"} /><div><p className="font-semibold">{habit.name}</p><p className="text-sm text-gray-500">{habit.category} · {done ? "completed" : "tap to complete"} for {formatDate(habitDate)}</p></div></button><div className="flex gap-2"><button onClick={() => editHabit(habit)} className={secondaryButton}><Edit3 size={18} /></button><button onClick={() => deleteHabit(habit.id)} className={deleteButton}><Trash2 size={18} /></button></div></div>; })}</div></Card></div>}
 
-        <SectionCard title="Schedule / to do" subtitle="Plan one thing for the day or add a reminder.">
-          <input
-            value={scheduleForm.title}
-            onChange={(e) => setScheduleForm((prev) => ({ ...prev, title: e.target.value }))}
-            className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-          />
-          <textarea
-            value={scheduleForm.note}
-            onChange={(e) => setScheduleForm((prev) => ({ ...prev, note: e.target.value }))}
-            rows={2}
-            className="mt-2 w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-3 py-3 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-          />
-          <PrimaryButton onClick={() => addScheduleItem(date)} className="mt-3">
-            <span aria-hidden="true">{icon("add")}</span>
-            Add To Schedule
-          </PrimaryButton>
-
-          <div className="mt-4 space-y-2">
-            {entry.schedule.length === 0 ? <p className="text-sm text-stone-500">No schedule items yet.</p> : null}
-            {entry.schedule.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-[#ede2cb] bg-[#fffcf7] p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-stone-900">{item.title}</p>
-                    {item.note ? <p className="mt-1 text-sm text-stone-600">{item.note}</p> : null}
-                  </div>
-                  <button onClick={() => removeScheduleItem(date, item.id)} className="rounded-xl p-2 text-stone-500 transition hover:bg-[#f8efdc]" aria-label="Remove schedule item">
-                    <span aria-hidden="true">{icon("archive")}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Mood, triggers, and notes" subtitle="Track how your body and mind are doing.">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-stone-700">How you&apos;re feeling</label>
-            <textarea
-              value={entry.feeling || ""}
-              onChange={(e) => setField(date, "feeling", e.target.value)}
-              rows={3}
-              className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-            />
-          </div>
-          <div className="mt-3">
-            <label className="mb-1 block text-sm font-medium text-stone-700">Potential food triggers</label>
-            <textarea
-              value={entry.triggers || ""}
-              onChange={(e) => setField(date, "triggers", e.target.value)}
-              rows={3}
-              className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-            />
-          </div>
-          <div className="mt-3">
-            <label className="mb-1 block text-sm font-medium text-stone-700">Daily notes</label>
-            <textarea
-              value={entry.notes || ""}
-              onChange={(e) => setField(date, "notes", e.target.value)}
-              rows={4}
-              className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-            />
-          </div>
-        </SectionCard>
-      </div>
-    );
-  }
-
-return (
-  <div className="min-h-screen bg-[radial-gradient(circle_at_top,#fff9ec_0%,#f7f0df_35%,#f3ecdb_100%)]">
-    <div className="mx-auto max-w-6xl px-4 pt-4 pb-3 sm:px-6 lg:px-8">
-      <div className="text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#b48a32]">
-          Simple wellness planning
-        </p>
-        <h1 className="mt-1 bg-gradient-to-r from-[#d2b16a] via-[#b78c39] to-[#826227] bg-clip-text text-2xl font-semibold tracking-tight text-transparent sm:text-3xl">
-          Health Tracker 365
-        </h1>
-      </div>
-
-      <div className="mt-4">
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-2 rounded-[28px] border border-[#eadfbe] bg-white/95 p-2 shadow-[0_16px_34px_rgba(180,150,85,0.18)]">
-          <TabButton active={tab === "today"} emoji={icon("today")} label="Today" onClick={() => setTab("today")} />
-          <TabButton active={tab === "calendar"} emoji={icon("calendar")} label="Calendar" onClick={() => setTab("calendar")} />
-          <TabButton active={tab === "habits"} emoji={icon("habits")} label="Habits" onClick={() => setTab("habits")} />
-          <TabButton active={tab === "insights"} emoji={icon("insights")} label="Insights" onClick={() => setTab("insights")} />
-        </div>
-      </div>
-    </div>
-
-    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-      {tab === "today" ? (
-        <div className="space-y-5">
-          <SectionCard title="Today" subtitle={formatDateLong(today)}>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <MetricCard label="Habits" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Done today" emoji={icon("habits")} />
-              <MetricCard label="Weight" value={todayEntry.weight || "-"} subtext="Today check-in" emoji={icon("weight")} />
-              <MetricCard label="Meals" value={`${todayEntry.meals.length}`} subtext="Logged today" emoji={icon("meals")} />
-              <MetricCard label="Flare" value={todayEntry.flareLevel || "-"} subtext="Today status" emoji={icon("flare")} />
-            </div>
-          </SectionCard>
-
-          {renderDayEditor(today)}
-        </div>
-      ) : null}
-
-        {tab === "calendar" ? (
-          <div className="space-y-5">
-            <SectionCard title="Calendar" subtitle="Tap a day, then log everything underneath.">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <button
-                  onClick={() =>
-                    setMonthCursor((prev) =>
-                      prev.month === 0 ? { year: prev.year - 1, month: 11 } : { year: prev.year, month: prev.month - 1 }
-                    )
-                  }
-                  className="rounded-2xl border border-[#e5dbc7] bg-[#fffdf8] px-3 py-2 text-sm shadow-sm transition hover:bg-[#fbf3df]"
-                >
-                  Prev
-                </button>
-                <div className="text-sm font-medium text-stone-700">{monthTitle}</div>
-                <button
-                  onClick={() =>
-                    setMonthCursor((prev) =>
-                      prev.month === 11 ? { year: prev.year + 1, month: 0 } : { year: prev.year, month: prev.month + 1 }
-                    )
-                  }
-                  className="rounded-2xl border border-[#e5dbc7] bg-[#fffdf8] px-3 py-2 text-sm shadow-sm transition hover:bg-[#fbf3df]"
-                >
-                  Next
-                </button>
-              </div>
-
-              <div className="mb-3 grid grid-cols-7 gap-2 text-center text-[10px] font-medium uppercase tracking-wide text-stone-500">
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                  <div key={day}>{day}</div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-7 gap-2">
-                {monthCells.map((cell, index) => {
-                  const day = cell.date ? getDayEntry(dayEntries, cell.date) : null;
-                  const flare = day?.flareLevel || "";
-                  const hasMeal = Boolean(day?.meals.length);
-                  const hasWorkout = Boolean(day?.workouts.length);
-                  const hasWeight = Boolean(day?.weight);
-
-                  return (
-                    <button
-                      key={`${cell.date || "empty"}-${index}`}
-                      disabled={!cell.date}
-                      onClick={() => cell.date && setSelectedDate(cell.date)}
-                      className={`aspect-square rounded-2xl border p-1.5 text-left transition ${
-                        cell.date ? "border-[#e6dcc6] bg-[#fffdf8] shadow-sm hover:bg-[#fbf3df]" : "border-transparent bg-transparent"
-                      } ${cell.date === selectedDate ? "ring-2 ring-[#d2b16a]" : ""}`}
-                    >
-                      {cell.date ? (
-                        <>
-                          <div className="text-xs font-medium text-stone-700">{cell.day}</div>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {hasMeal ? <span className="h-1.5 w-1.5 rounded-full bg-amber-400" /> : null}
-                            {hasWorkout ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> : null}
-                            {flare && flare !== "None" ? <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> : null}
-                            {hasWeight ? <span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> : null}
-                          </div>
-                        </>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Selected day" subtitle={formatDateLong(selectedDate)}>
-              <div className="flex flex-wrap gap-2">
-                <SmallPill>Weight: {selectedEntry.weight || "-"}</SmallPill>
-                <SmallPill>Calories: {selectedEntry.calories || "-"}</SmallPill>
-                <SmallPill>Mood: {selectedEntry.mood || "-"}</SmallPill>
-                <SmallPill>Flare: {selectedEntry.flareLevel || "-"}</SmallPill>
-                <SmallPill>{selectedEntry.meals.length} meals</SmallPill>
-                <SmallPill>{selectedEntry.workouts.length} workouts</SmallPill>
-              </div>
-            </SectionCard>
-
-            {renderDayEditor(selectedDate)}
-          </div>
-        ) : null}
-
-        {tab === "habits" ? (
-          <div className="space-y-5">
-            <SectionCard title="Habits" subtitle="Clean, simple habit tracking that works well on your phone.">
-              <div className="flex flex-wrap gap-2">
-                <PrimaryButton onClick={() => setShowHabitForm(true)}>
-                  <span aria-hidden="true">{icon("add")}</span>
-                  Add Habit
-                </PrimaryButton>
-                <button
-                  onClick={resetToday}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-[#e5dbc7] bg-[#fffdf8] px-4 py-2.5 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-[#fbf3df]"
-                >
-                  <span aria-hidden="true">{icon("reset")}</span>
-                  Reset Today
-                </button>
-              </div>
-            </SectionCard>
-
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <MetricCard label="Today" value={`${completedToday}/${activeHabits.length || 0}`} subtext="Completed" emoji={icon("habits")} />
-              <MetricCard label="Streak" value={`${bestStreak}`} subtext="Best current streak" emoji={icon("streak")} />
-              <MetricCard label="30 days" value={`${totalHabitCheckins30}`} subtext="Total check-ins" emoji={icon("insights")} />
-              <MetricCard label="Active" value={`${activeHabits.length}`} subtext="Current habits" emoji={icon("today")} />
-            </div>
-
-            <SectionCard title="Today&apos;s habit list" subtitle="Tap the circle to check it off.">
-              {activeHabits.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-[#d7ccb7] bg-[#fcf7ed] p-8 text-center">
-                  <p className="text-base font-medium text-stone-700">No habits yet</p>
-                  <p className="mt-2 text-sm text-stone-500">Start with a few simple habits.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {activeHabits.map((habit) => {
-                    const done = isDone(logs, habit.id, today);
-                    const streak = getStreak(logs, habit.id);
-                    const weeklyDone = countInDates(logs, habit.id, weekDates);
-                    const weeklyTarget = habit.frequency === "daily" ? 7 : habit.weeklyTarget;
-                    const percent = Math.min(100, Math.round((weeklyDone / Math.max(weeklyTarget, 1)) * 100));
-
-                    return (
-                      <div key={habit.id} className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-4 shadow-sm">
-                        <div className="flex items-start gap-3">
-                          <button
-                            onClick={() => setLogs((prev) => toggleLog(prev, habit.id, today))}
-                            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-lg transition ${
-                              done
-                                ? "border-[#c89d49] bg-gradient-to-b from-[#f8e9bf] to-[#eacb84] text-[#6f5522]"
-                                : "border-[#d9ceb9] bg-white"
-                            }`}
-                            aria-label={`Toggle ${habit.name}`}
-                          >
-                            {done ? "✓" : "○"}
-                          </button>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <h3 className="text-base font-semibold text-stone-900">{habit.name}</h3>
-                                <p className="mt-1 text-xs uppercase tracking-wide text-stone-500">
-                                  {habit.category} • {habit.frequency === "daily" ? "daily" : `${habit.weeklyTarget}x weekly`}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => archiveHabit(habit.id)}
-                                className="rounded-xl p-2 text-stone-500 transition hover:bg-[#f8efdc]"
-                                title="Archive habit"
-                              >
-                                <span aria-hidden="true">{icon("archive")}</span>
-                              </button>
-                            </div>
-
-                            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                              <div className="rounded-2xl border border-[#eee3cd] bg-white p-3">
-                                <p className="text-[11px] uppercase tracking-wide text-stone-500">Streak</p>
-                                <p className="mt-1 font-semibold text-stone-900">{streak}d</p>
-                              </div>
-                              <div className="rounded-2xl border border-[#eee3cd] bg-white p-3">
-                                <p className="text-[11px] uppercase tracking-wide text-stone-500">Week</p>
-                                <p className="mt-1 font-semibold text-stone-900">{weeklyDone}/{weeklyTarget}</p>
-                              </div>
-                              <div className="rounded-2xl border border-[#eee3cd] bg-white p-3">
-                                <p className="text-[11px] uppercase tracking-wide text-stone-500">Progress</p>
-                                <p className="mt-1 font-semibold text-stone-900">{percent}%</p>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#efe5cf]">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-[#efd08b] via-[#d1a857] to-[#b78532] transition-all"
-                                style={{ width: `${percent}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </SectionCard>
-
-            <SectionCard title="Week view" subtitle="Tap across the week for quick logging.">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <SmallPill>{totalHabitCheckins30} check-ins in last 30 days</SmallPill>
-                <select
-                  value={selectedHabitId}
-                  onChange={(e) => setSelectedHabitId(e.target.value)}
-                  className="rounded-2xl border border-[#e5dbc7] bg-[#fffdf8] px-3 py-2.5 text-sm outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-                >
-                  <option value="all">All habits</option>
-                  {activeHabits.map((habit) => (
-                    <option key={habit.id} value={habit.id}>{habit.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-3 overflow-x-auto">
-                <div className="min-w-[560px] space-y-3">
-                  {selectedHabits.map((habit) => (
-                    <div key={habit.id} className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-3 shadow-sm">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="font-medium text-stone-900">{habit.name}</h3>
-                          <p className="text-xs text-stone-500">Tap any day to toggle.</p>
-                        </div>
-                        <SmallPill>{habit.frequency === "daily" ? "Daily" : `${habit.weeklyTarget}x weekly`}</SmallPill>
-                      </div>
-
-                      <div className="grid grid-cols-7 gap-2">
-                        {weekDates.map((date) => {
-                          const done = isDone(logs, habit.id, date);
-                          const isTodayCell = date === today;
-                          const label = new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: "short" });
-                          const dayNumber = new Date(`${date}T12:00:00`).getDate();
-
-                          return (
-                            <button
-                              key={date}
-                              onClick={() => setLogs((prev) => toggleLog(prev, habit.id, date))}
-                              className={`rounded-2xl border p-3 text-center transition ${
-                                done
-                                  ? "border-[#d4b96e] bg-gradient-to-b from-[#fbf1d4] to-[#f3e0ab]"
-                                  : "border-[#e6dcc6] bg-white"
-                              } ${isTodayCell ? "ring-1 ring-[#ccb070]" : ""}`}
-                            >
-                              <div className="text-xs text-stone-500">{label}</div>
-                              <div className="mt-1 text-sm font-semibold text-stone-900">{dayNumber}</div>
-                              <div className="mt-2 flex justify-center">
-                                <span className={`flex h-6 w-6 items-center justify-center rounded-full border ${done ? "border-[#c8aa5a] bg-[#eed89a]" : "border-[#e3d8c1] bg-[#fcfaf5]"}`}>
-                                  {done ? "✓" : ""}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </SectionCard>
-          </div>
-        ) : null}
-
-        {tab === "insights" ? (
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <MetricCard label="Workouts" value={`${workoutCount30}`} subtext="Last 30 days" emoji={icon("workouts")} />
-              <MetricCard label="Meals" value={`${mealCount30}`} subtext="Last 30 days" emoji={icon("meals")} />
-              <MetricCard label="Flare days" value={`${flareDays30}`} subtext="With symptoms" emoji={icon("flare")} />
-              <MetricCard label="Weights" value={`${daysWithWeight30}`} subtext="Days checked in" emoji={icon("weight")} />
-            </div>
-
-            <SectionCard title="Pattern snapshot" subtitle="Simple stats to help you notice trends.">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-4 shadow-sm">
-                  <p className="text-sm font-medium text-stone-700">Average calories</p>
-                  <p className="mt-2 text-3xl font-semibold text-stone-900">{avgCalories30 || "-"}</p>
-                  <p className="mt-1 text-sm text-stone-500">Based on days where calories were entered</p>
-                </div>
-                <div className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-4 shadow-sm">
-                  <p className="text-sm font-medium text-stone-700">Habit consistency</p>
-                  <p className="mt-2 text-3xl font-semibold text-stone-900">{totalHabitCheckins30}</p>
-                  <p className="mt-1 text-sm text-stone-500">Total habit check-ins across the last 30 days</p>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Upcoming schedule" subtitle="Pulled from the dates you already filled in.">
-              <div className="space-y-2">
-                {upcomingSchedule.length === 0 ? <p className="text-sm text-stone-500">No upcoming schedule items yet.</p> : null}
-                {upcomingSchedule.map(([date, entry]) => (
-                  <div key={date} className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-4 shadow-sm">
-                    <p className="text-sm font-semibold text-stone-900">{formatDateLong(date)}</p>
-                    <div className="mt-2 space-y-2">
-                      {entry.schedule.map((item) => (
-                        <div key={item.id} className="rounded-2xl border border-[#eee3cd] bg-white p-3">
-                          <p className="font-medium text-stone-900">{item.title}</p>
-                          {item.note ? <p className="mt-1 text-sm text-stone-600">{item.note}</p> : null}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-
-            <SectionCard title="Recent flare log" subtitle="A quick look at symptom days.">
-              <div className="space-y-2">
-                {recentFlares.length === 0 ? <p className="text-sm text-stone-500">No flare days logged yet.</p> : null}
-                {recentFlares.map(([date, entry]) => (
-                  <div key={date} className="rounded-3xl border border-[#e8dcc4] bg-[#fffdf8] p-4 shadow-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <SmallPill>{formatDateShort(date)}</SmallPill>
-                      <SmallPill>Flare: {entry.flareLevel || "-"}</SmallPill>
-                      <SmallPill>Mood: {entry.mood || "-"}</SmallPill>
-                    </div>
-                    {entry.triggers ? <p className="mt-3 text-sm text-stone-700"><span className="font-medium">Triggers:</span> {entry.triggers}</p> : null}
-                    {entry.notes ? <p className="mt-2 text-sm text-stone-600">{entry.notes}</p> : null}
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          </div>
-        ) : null}
-      </div>
-
-      {showHabitForm ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/30 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-[28px] border border-[#eadfbe] bg-white/95 p-5 shadow-[0_20px_50px_rgba(90,70,20,0.18)] backdrop-blur-sm">
-            <div className="mb-4">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#b48a32]">New Habit</p>
-              <h2 className="mt-2 text-xl font-semibold text-stone-900">Add a new habit</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">Habit name</label>
-                <input
-                  value={habitForm.name}
-                  onChange={(e) => setHabitForm((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Category</label>
-                  <select
-                    value={habitForm.category}
-                    onChange={(e) => setHabitForm((prev) => ({ ...prev, category: e.target.value as Category }))}
-                    className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-                  >
-                    {categoryOptions.map((category) => (
-                      <option key={category} value={category}>{category}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Frequency</label>
-                  <select
-                    value={habitForm.frequency}
-                    onChange={(e) => setHabitForm((prev) => ({ ...prev, frequency: e.target.value as Frequency }))}
-                    className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-                  >
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
-                </div>
-              </div>
-
-              {habitForm.frequency === "weekly" ? (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">Times per week</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={7}
-                    value={habitForm.weeklyTarget}
-                    onChange={(e) => setHabitForm((prev) => ({ ...prev, weeklyTarget: Number(e.target.value) || 1 }))}
-                    className="w-full rounded-2xl border border-[#e6dcc6] bg-[#fffdf8] px-4 py-3 outline-none transition focus:border-[#d0b06a] focus:ring-2 focus:ring-[#f3e6bf]"
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setShowHabitForm(false)}
-                className="flex-1 rounded-2xl border border-[#e5dbc7] bg-[#fffdf8] px-4 py-3 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-[#fbf3df]"
-              >
-                Cancel
-              </button>
-              <PrimaryButton onClick={addHabit} className="flex-1 justify-center">
-                Save Habit
-              </PrimaryButton>
-            </div>
-          </div>
-        </div>
-      ) : null}
+        {tab === "insights" && <div className="grid gap-6 md:grid-cols-2"><Card><GoldIcon large><LineChart size={34} /></GoldIcon><h2 className="mt-4 text-2xl font-semibold">Weekly Snapshot</h2><p className="mt-2 text-gray-500">Workouts this week: {workoutsThisWeek}</p><p className="text-gray-500">Habits completed today: {todaysHabitLogs}/{habits.length}</p><p className="text-gray-500">Meals logged today: {todaysMeals.length}</p></Card><Card><GoldIcon large><Trophy size={34} /></GoldIcon><h2 className="mt-4 text-2xl font-semibold">Progress Summary</h2><p className="mt-2 text-gray-500">Total lost: {hasWeightSetup ? `${totalLost.toFixed(1)} lb` : "Set up weight first"}</p><p className="text-gray-500">Strength PRs: {strengthPRs.length}</p><p className="text-gray-500">Progress photos: {photos.length}</p></Card></div>}
+      </main>
+      <nav className="fixed bottom-3 left-3 right-3 z-50 rounded-[28px] border border-[#efe6d2] bg-white/95 p-2 shadow-lg backdrop-blur sm:left-1/2 sm:max-w-3xl sm:-translate-x-1/2"><div className="grid grid-cols-7 gap-1">{nav.map((item) => <button key={item.id} onClick={() => setTab(item.id)} className="flex flex-col items-center justify-center rounded-2xl px-1 py-2 text-[11px] font-medium transition hover:bg-[#FFF8E8] sm:text-sm" style={{ color: tab === item.id ? gold : "#777" }}>{item.icon}<span className="mt-1 hidden sm:block">{item.label}</span></button>)}</div></nav>
     </div>
   );
 }
