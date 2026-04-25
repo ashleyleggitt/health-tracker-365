@@ -80,7 +80,7 @@ function weekLabel(weekStart: string) {
 }
 
 function GoldIcon({ children, large = false }: { children: React.ReactNode; large?: boolean }) {
-  return <div className={`flex items-center justify-center rounded-2xl ${large ? "h-14 w-14" : "h-11 w-11"}`} style={{ color: gold, background: "#FFF8E8" }}>{children}</div>;
+  return <div className={`flex items-center justify-center rounded-2xl ${large ? "h-12 w-12 sm:h-14 sm:w-14" : "h-10 w-10 sm:h-11 sm:w-11"}`} style={{ color: gold, background: "#FFF8E8" }}>{children}</div>;
 }
 
 function PlaceholderText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
@@ -88,14 +88,14 @@ function PlaceholderText({ children, className = "" }: { children: React.ReactNo
 }
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-[30px] border border-[#efe6d2] bg-white p-5 shadow-sm ${className}`}>{children}</div>;
+  return <div className={`rounded-[26px] border border-[#eadfbe] bg-white p-4 shadow-sm sm:rounded-[30px] sm:p-5 ${className}`}>{children}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="mb-2 block text-sm text-gray-600">{label}</span>{children}</label>;
 }
 
-const inputClass = "w-full rounded-2xl border border-[#efe6d2] bg-[#FFFDF8] p-3 outline-none placeholder:text-gray-300 focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4]";
+const inputClass = "w-full rounded-2xl border border-[#efe6d2] bg-[#FFFDF8] p-3 text-base outline-none placeholder:text-gray-300 focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4] sm:text-lg";
 const primaryButton = "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 font-semibold text-white shadow-sm transition hover:brightness-95";
 const secondaryButton = "inline-flex items-center justify-center gap-2 rounded-2xl border border-[#efe6d2] bg-white px-4 py-3 font-semibold text-gray-700 transition hover:bg-[#FFF8E8]";
 const deleteButton = "inline-flex items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 px-3 py-2 text-rose-500 transition hover:bg-rose-100";
@@ -110,12 +110,12 @@ function HabitRing({ value, empty = false }: { value: number; empty?: boolean })
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (value / 100) * circumference;
   return (
-    <div className="relative mx-auto flex h-36 w-36 items-center justify-center">
-      <svg className="absolute h-36 w-36 -rotate-90" viewBox="0 0 140 140">
+    <div className="relative mx-auto flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
+      <svg className="absolute h-28 w-28 -rotate-90 sm:h-36 sm:w-36" viewBox="0 0 140 140">
         <circle cx="70" cy="70" r={radius} fill="none" stroke="#F4EAD6" strokeWidth={stroke} />
         <circle cx="70" cy="70" r={radius} fill="none" stroke={empty ? "#E9DEC9" : gold} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={empty ? circumference : offset} />
       </svg>
-      <div className="text-center"><p className={`text-3xl font-semibold ${empty ? "text-gray-400" : "text-stone-950"}`}>{empty ? "0%" : `${value}%`}</p><p className="text-xs text-gray-500">complete</p></div>
+      <div className="text-center"><p className={`text-2xl font-semibold sm:text-3xl ${empty ? "text-gray-400" : "text-stone-950"}`}>{empty ? "0%" : `${value}%`}</p><p className="text-xs text-gray-500">complete</p></div>
     </div>
   );
 }
@@ -319,17 +319,17 @@ export default function HealthTracker365() {
 
   return (
     <div className="min-h-screen pb-28" style={{ background: cream, color: darkText }}>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <header className="mb-8 flex items-center justify-between">
-          <div><h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">Health Tracker <span style={{ color: "#E4C985" }}>365</span></h1><p className="mt-2 text-gray-500">Track your health. Transform your life.</p></div>
+      <main className="mx-auto max-w-7xl px-3 py-5 sm:px-6 lg:px-8">
+        <header className="mb-5 text-center sm:mb-8 sm:text-left">
+          <div><h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">Health Tracker <span style={{ color: "#E4C985" }}>365</span></h1><p className="mt-1 text-base text-gray-500 sm:mt-2 sm:text-lg">Track your health. Transform your life.</p></div>
         </header>
 
         {tab === "dashboard" && <div className="space-y-6">
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <Card><GoldIcon large><Scale size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Weight Progress</h2>{latestWeight ? <><p className="mt-3 text-4xl font-semibold">{latestWeight} <span className="text-xl font-normal">lbs</span></p><p className="mt-1 text-gray-500">current weight</p><div className="mt-5"><ProgressBar value={goalProgress} /></div><p className="mt-2 text-sm text-gray-500">{hasWeightSetup ? `${totalLost.toFixed(1)} lbs lost` : "Add start + goal weight"}</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">Log first weight</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your trend will show here</PlaceholderText><div className="mt-6"><ProgressBar value={0} /></div><button onClick={() => setTab("weight")} className="mt-5 text-sm font-semibold" style={{ color: gold }}>Open weight log ›</button></>}</Card>
-            <Card><GoldIcon large><Trophy size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Strength PRs</h2>{strengthPRs.length > 0 ? <><p className="mt-3 text-4xl font-semibold">{strengthPRs.length}</p><p className="mt-1 text-gray-500">records tracked</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">No records yet</PlaceholderText><PlaceholderText className="mt-1 text-sm">Log exercise weight to track PRs</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View PRs <span>›</span></button></Card>
-            <Card><GoldIcon large><Flame size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Workouts</h2>{workoutsThisWeek > 0 ? <><p className="mt-3 text-4xl font-semibold">{workoutsThisWeek}</p><p className="mt-1 text-gray-500">this week</p></> : <><PlaceholderText className="mt-4 text-2xl font-semibold">Log first workout</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your weekly total will show here</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View Workouts <span>›</span></button></Card>
-            <Card><GoldIcon large><CheckCircle2 size={34} /></GoldIcon><h2 className="mt-5 text-xl font-semibold">Habits</h2><HabitRing value={habitProgress} empty={!hasHabits} />{hasHabits ? <p className="mt-3 text-center text-gray-500">{todaysHabitLogs} of {habits.length} completed</p> : <PlaceholderText className="mt-3 text-center text-sm">Set up habits to track</PlaceholderText>}</Card>
+          <div className="grid grid-cols-2 gap-3 sm:gap-5 xl:grid-cols-4">
+            <Card><GoldIcon large><Scale size={30} /></GoldIcon><h2 className="mt-4 text-base font-semibold sm:text-xl">Weight Progress</h2>{latestWeight ? <><p className="mt-2 text-2xl font-semibold sm:mt-3 sm:text-4xl">{latestWeight} <span className="text-sm font-normal sm:text-xl">lbs</span></p><p className="mt-1 text-gray-500">current weight</p><div className="mt-5"><ProgressBar value={goalProgress} /></div><p className="mt-2 text-sm text-gray-500">{hasWeightSetup ? `${totalLost.toFixed(1)} lbs lost` : "Add start + goal weight"}</p></> : <><PlaceholderText className="mt-3 text-xl font-semibold sm:mt-4 sm:text-2xl">Log first weight</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your trend will show here</PlaceholderText><div className="mt-6"><ProgressBar value={0} /></div><button onClick={() => setTab("weight")} className="mt-5 text-sm font-semibold" style={{ color: gold }}>Open weight log ›</button></>}</Card>
+            <Card><GoldIcon large><Trophy size={30} /></GoldIcon><h2 className="mt-4 text-base font-semibold sm:text-xl">Strength PRs</h2>{strengthPRs.length > 0 ? <><p className="mt-2 text-2xl font-semibold sm:mt-3 sm:text-4xl">{strengthPRs.length}</p><p className="mt-1 text-gray-500">records tracked</p></> : <><PlaceholderText className="mt-3 text-xl font-semibold sm:mt-4 sm:text-2xl">No records yet</PlaceholderText><PlaceholderText className="mt-1 text-sm">Log exercise weight to track PRs</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View PRs <span>›</span></button></Card>
+            <Card><GoldIcon large><Flame size={30} /></GoldIcon><h2 className="mt-4 text-base font-semibold sm:text-xl">Workouts</h2>{workoutsThisWeek > 0 ? <><p className="mt-2 text-2xl font-semibold sm:mt-3 sm:text-4xl">{workoutsThisWeek}</p><p className="mt-1 text-gray-500">this week</p></> : <><PlaceholderText className="mt-3 text-xl font-semibold sm:mt-4 sm:text-2xl">Log first workout</PlaceholderText><PlaceholderText className="mt-1 text-sm">Your weekly total will show here</PlaceholderText></>}<button onClick={() => setTab("workouts")} className="mt-8 flex w-full justify-between text-gray-700">View Workouts <span>›</span></button></Card>
+            <Card><GoldIcon large><CheckCircle2 size={30} /></GoldIcon><h2 className="mt-4 text-base font-semibold sm:text-xl">Habits</h2><HabitRing value={habitProgress} empty={!hasHabits} />{hasHabits ? <p className="mt-3 text-center text-gray-500">{todaysHabitLogs} of {habits.length} completed</p> : <PlaceholderText className="mt-3 text-center text-sm">Set up habits to track</PlaceholderText>}</Card>
           </div>
           <Card><div className="grid gap-5 md:grid-cols-[1fr_2fr_1fr] md:items-center"><div><GoldIcon><Weight size={28} /></GoldIcon>{hasWeightSetup ? <p className="mt-3 text-3xl font-semibold" style={{ color: gold }}>{goalProgress}%</p> : <PlaceholderText className="mt-3 text-2xl font-semibold">Set goal</PlaceholderText>}<p className="text-gray-500">goal progress</p></div><div><p className="mb-2 text-center text-gray-600">{hasWeightSetup ? `${remaining.toFixed(1)} lbs to go` : "Enter starting + goal weight"}</p><ProgressBar value={goalProgress} /></div><div className="md:text-right"><p className="text-gray-500">Goal Weight</p>{goalNum ? <p className="text-3xl font-semibold" style={{ color: gold }}>{goalNum} lbs</p> : <PlaceholderText className="text-2xl font-semibold">Add goal</PlaceholderText>}</div></div></Card>
           <div className="grid gap-6 lg:grid-cols-2"><Card><div className="mb-4 flex items-center justify-between"><h2 className="flex items-center gap-3 text-xl font-semibold"><CalendarDays color={gold} /> Today</h2><span style={{ color: gold }}>{formatDate(todayInputDate())}</span></div>{[[<Scale key="scale" />, "Weight", latestWeight ? `${latestWeight} lbs` : "Enter weight", "weight"], [<Utensils key="meal" />, "Meals", todaysMeals.length ? `${todaysMeals.length} logged` : "Log meal", "food"], [<Dumbbell key="workout" />, "Workout", workoutsThisWeek > 0 ? `${workoutsThisWeek} this week` : "Log workout", "workouts"], [<CheckCircle2 key="habits" />, "Habits", hasHabits ? `${todaysHabitLogs}/${habits.length}` : "Set habits", "habits"], [<Smile key="mood" />, "Mood", mood || "Add mood", "food"], [<Edit3 key="note" />, "Notes", dailyNote ? "Added" : "Add note", "food"]].map((row) => <button key={String(row[1])} onClick={() => setTab(row[3] as Tab)} className="flex w-full items-center justify-between border-b border-[#efe6d2] py-4 text-left last:border-b-0"><span className="flex items-center gap-3 text-gray-700"><span style={{ color: gold }}>{row[0]}</span>{row[1]}</span><span className="flex items-center gap-3 text-gray-400">{row[2]} <span>›</span></span></button>)}</Card><Card><h2 className="mb-4 flex items-center gap-3 text-xl font-semibold"><Edit3 color={gold} /> Quick Log</h2><div className="grid grid-cols-3 gap-4 text-center">{[[<Scale key="qw" size={34} />, "Weight", "weight"], [<Dumbbell key="qwo" size={34} />, "Workout", "workouts"], [<Utensils key="qm" size={34} />, "Meal", "food"], [<CheckCircle2 key="qh" size={34} />, "Habit", "habits"], [<Smile key="qs" size={34} />, "Mood", "food"], [<NotebookTabs key="qn" size={34} />, "Note", "food"]].map((item) => <button key={String(item[1])} onClick={() => setTab(item[2] as Tab)} className="rounded-3xl border border-[#efe6d2] bg-white p-4 hover:bg-[#FFF8E8]"><div className="flex justify-center" style={{ color: gold }}>{item[0]}</div><p className="mt-2 text-sm text-gray-700">{item[1]}</p></button>)}</div></Card></div>
