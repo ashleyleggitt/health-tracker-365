@@ -256,7 +256,7 @@ function DateNavigator({
               type="date"
               value={selectedDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="min-w-0 max-w-[155px] cursor-pointer rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] px-2 py-2 text-center text-sm font-semibold text-stone-900 outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4] sm:max-w-none sm:px-4 sm:text-lg"
+              className="min-w-0 max-w-[210px] px-5 py-3 text-lg font-bold cursor-pointer rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] px-2 py-2 text-center text-sm font-semibold text-stone-900 outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4] sm:max-w-none sm:px-4 sm:text-lg"
               style={{ colorScheme: "light" }}
               aria-label="Jump to date"
             />
