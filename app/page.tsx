@@ -248,25 +248,23 @@ function DateNavigator({
           <ChevronLeft size={24} />
         </button>
 
-        <div className="min-w-0 text-center">
-          <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Selected Date</p>
-          <div className="mt-1 flex items-center justify-center gap-2">
-            <CalendarDays size={22} color={gold} />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="min-w-0 max-w-[210px] px-5 py-3 text-lg font-bold cursor-pointer rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] px-2 py-2 text-center text-sm font-semibold text-stone-900 outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4] sm:max-w-none sm:px-4 sm:text-lg"
-              style={{ colorScheme: "light" }}
-              aria-label="Jump to date"
-            />
-          </div>
-    </div>
-
+      <div className="mt-1 flex items-center justify-center">
+  <div className="flex items-center gap-2 rounded-2xl border border-[#eadfca] bg-[#fff8e8] px-6 py-3 text-lg font-bold shadow-sm">
+    <CalendarDays size={20} color={gold} />
+    <input
+      type="date"
+      value={selectedDate}
+      onChange={(e) => onDateChange(e.target.value)}
+      className="bg-transparent outline-none cursor-pointer"
+      style={{ colorScheme: "light" }}
+      aria-label="Jump to date"
+    />
+  </div>
+</div>
         <button
           type="button"
           onClick={onNext}
-          className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] text-stone-800 sm:h-14 sm:w-14"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] text-stone-800 sm:h-14 sm:w-14"
           aria-label="Next day"
         >
           <ChevronRight size={24} />
