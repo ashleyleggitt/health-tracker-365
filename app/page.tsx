@@ -261,7 +261,6 @@ function DateNavigator({
               aria-label="Jump to date"
             />
           </div>
-          <p className="mt-1 text-sm font-medium text-gray-500 sm:text-base">{formatDate(selectedDate)}</p>
         </div>
 
         <button
