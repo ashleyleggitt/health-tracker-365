@@ -225,7 +225,17 @@ function MiniWeightChart({ weights }: { weights: WeightEntry[] }) {
   );
 }
 
-function DateNavigator({ selectedDate, onPrevious, onNext }: { selectedDate: string; onPrevious: () => void; onNext: () => void }) {
+function DateNavigator({
+  selectedDate,
+  onPrevious,
+  onNext,
+  onDateChange
+}: {
+  selectedDate: string;
+  onPrevious: () => void;
+  onNext: () => void;
+  onDateChange: (date: string) => void;
+}) {
   return (
     <div className="mb-5 rounded-[28px] border border-[#eadfbe] bg-white p-3 shadow-sm sm:p-4">
       <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3">
@@ -238,9 +248,20 @@ function DateNavigator({ selectedDate, onPrevious, onNext }: { selectedDate: str
           <ChevronLeft size={24} />
         </button>
 
-        <div className="text-center">
+        <div className="min-w-0 text-center">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Selected Date</p>
-          <h2 className="text-2xl font-semibold tracking-tight text-stone-950 sm:text-4xl">{formatDate(selectedDate)}</h2>
+          <div className="mt-1 flex items-center justify-center gap-2">
+            <CalendarDays size={22} color={gold} />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="min-w-0 max-w-[155px] cursor-pointer rounded-2xl border border-[#eadfbe] bg-[#FFF8E8] px-2 py-2 text-center text-sm font-semibold text-stone-900 outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#F3E7C4] sm:max-w-none sm:px-4 sm:text-lg"
+              style={{ colorScheme: "light" }}
+              aria-label="Jump to date"
+            />
+          </div>
+          <p className="mt-1 text-sm font-medium text-gray-500 sm:text-base">{formatDate(selectedDate)}</p>
         </div>
 
         <button
@@ -607,7 +628,12 @@ export default function HealthTracker365() {
           </div>
         </header>
 
-        <DateNavigator selectedDate={selectedDate} onPrevious={() => changeSelectedDate(-1)} onNext={() => changeSelectedDate(1)} />
+        <DateNavigator
+          selectedDate={selectedDate}
+          onPrevious={() => changeSelectedDate(-1)}
+          onNext={() => changeSelectedDate(1)}
+          onDateChange={(date) => setSelectedDate(date)}
+        />
 
         {tab === "dashboard" && (
           <div className="space-y-6">
