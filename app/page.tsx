@@ -262,7 +262,12 @@ function DateNavigator({
             />
           </div>
           <p className="mt-1 text-sm font-medium text-gray-500 sm:text-base">
-  {selectedDate.toLocaleDateString()}
+{new Date(selectedDate + "T00:00:00").toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+})}
 </p>
 </div>
 
