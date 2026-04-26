@@ -261,7 +261,10 @@ function DateNavigator({
               aria-label="Jump to date"
             />
           </div>
-        </div>
+          <p className="mt-1 text-sm font-medium text-gray-500 sm:text-base">
+  {selectedDate.toLocaleDateString()}
+</p>
+</div>
 
         <button
           type="button"
